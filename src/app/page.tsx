@@ -125,6 +125,32 @@ export default function Home() {
     });
   }
 
+  const fadeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function fadeIn(a: HTMLAudioElement, ms = 500) {
+    if (fadeTimer.current) clearInterval(fadeTimer.current);
+    a.volume = 0;
+    const step = 1 / (ms / 16);
+    fadeTimer.current = setInterval(() => {
+      a.volume = Math.min(1, a.volume + step);
+      if (a.volume >= 1 && fadeTimer.current) clearInterval(fadeTimer.current);
+    }, 16);
+  }
+
+  function fadeOut(a: HTMLAudioElement, ms = 350, onDone?: () => void) {
+    if (fadeTimer.current) clearInterval(fadeTimer.current);
+    const step = a.volume / (ms / 16);
+    fadeTimer.current = setInterval(() => {
+      a.volume = Math.max(0, a.volume - step);
+      if (a.volume <= 0 && fadeTimer.current) {
+        clearInterval(fadeTimer.current);
+        a.pause();
+        a.volume = 1;
+        onDone?.();
+      }
+    }, 16);
+  }
+
   const touchX = useRef(0);
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX;
@@ -140,11 +166,13 @@ export default function Home() {
 
   function toggle() {
     const a = audioRef.current;
+    if (!a) return;
     if (playing) {
-      a?.pause();
       setPlaying(false);
+      fadeOut(a, 350);
     } else {
-      a?.play().catch(() => {});
+      a.play().catch(() => {});
+      fadeIn(a, 500);
       setPlaying(true);
     }
   }
