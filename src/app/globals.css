@@ -382,9 +382,12 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 1.5rem;
-  line-height: 1.1;
+  line-height: 1.15;
   margin-top: 0.4rem;
   text-align: center;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .player-card__author {
