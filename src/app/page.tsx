@@ -419,7 +419,7 @@ export default function Home() {
       {/* ── Header ─────────────────────────────── */}
       <header
         className="rounded-xl relative flex items-center justify-between px-4 md:px-6 py-1.5 md:py-2"
-        style={{ background: "var(--paper)" }}
+        style={{ background: "var(--yellow)" }}
       >
         <a href="#" className="flex items-center shrink-0 shine-wrap">
           <img src="/tracksnack-long.png" alt="TrackSnack" className="h-14 md:h-20 w-auto" />
