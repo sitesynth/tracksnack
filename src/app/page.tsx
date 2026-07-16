@@ -77,6 +77,7 @@ function Road() {
 export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const songTitleRef = useRef<HTMLSpanElement>(null);
+  const nextTitleRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(false);
   const [trackIdx, setTrackIdx] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -129,15 +130,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const el = songTitleRef.current;
-    if (!el) return;
-    const overflow = el.scrollWidth - (el.parentElement?.clientWidth ?? 0);
-    if (overflow > 4) {
-      el.style.setProperty("--sx", `-${overflow}px`);
-      el.classList.add("scrolling");
-    } else {
-      el.style.removeProperty("--sx");
-      el.classList.remove("scrolling");
+    for (const el of [songTitleRef.current, nextTitleRef.current]) {
+      if (!el) continue;
+      const overflow = el.scrollWidth - (el.parentElement?.clientWidth ?? 0);
+      if (overflow > 4) {
+        el.style.setProperty("--sx", `-${overflow}px`);
+        el.classList.add("scrolling");
+      } else {
+        el.style.removeProperty("--sx");
+        el.classList.remove("scrolling");
+      }
     }
   }, [trackIdx, tracks, expanded]);
 
@@ -375,7 +377,7 @@ export default function Home() {
                 >
                   <span className="player-card__next-label menu-type">next up</span>
                   <img src={next.imageUrl} alt={next.title} className="player-card__next-img" />
-                  <span className="player-card__next-title">{next.title}</span>
+                  <span className="player-card__next-title"><span ref={nextTitleRef} className="player__song-text">{next.title}</span></span>
                   <span className="font-black opacity-40">›</span>
                 </button>
               </div>
