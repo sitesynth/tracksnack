@@ -345,23 +345,23 @@ body {
 
 .player-card__close {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 1.7rem;
-  height: 1.7rem;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
   border: 2px solid var(--ink);
   background: var(--cream-deep);
-  font-size: 1rem;
-  font-weight: 900;
-  line-height: 1;
+  box-shadow: 0 3px 0 0 var(--ink);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s;
+  transition: transform 0.15s, box-shadow 0.1s;
+  flex-shrink: 0;
 }
 .player-card__close:hover { transform: rotate(90deg); }
+.player-card__close:active { box-shadow: none; transform: rotate(90deg) translateY(3px); }
 
 .player-card__cover {
   display: flex;

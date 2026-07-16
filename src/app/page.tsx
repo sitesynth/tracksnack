@@ -317,7 +317,10 @@ export default function Home() {
                   onClick={() => setExpanded(false)}
                   aria-label="Collapse player"
                 >
-                  ×
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
                 </button>
                 <img src={curr.imageUrl} alt={curr.title} className="player-card__cover object-cover" />
                 <p className="player-card__song">
