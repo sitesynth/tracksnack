@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+
+const LIKES_API = "http://138.2.134.17:62000";
 
 export async function GET() {
-  if (!supabase) return NextResponse.json({});
-  const { data } = await supabase.from("likes").select("track_id, count");
-  const result: Record<string, number> = {};
-  for (const row of data ?? []) result[row.track_id] = row.count;
-  return NextResponse.json(result);
+  try {
+    const res = await fetch(`${LIKES_API}/likes`, { next: { revalidate: 0 } });
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch {
+    return NextResponse.json({});
+  }
 }
