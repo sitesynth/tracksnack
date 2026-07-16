@@ -1,0 +1,10 @@
+.next/
+node_modules/
+*.avif
+*.png
+*.lottie
+out/
+.env*
+tracksnack-idea.md
+.claude/
+vinyl.svg
