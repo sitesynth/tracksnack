@@ -27,6 +27,8 @@ type Playlist = {
   name: string;
   song_count: number;
   cover_url: string;
+  display_name?: string;
+  description?: string;
 };
 
 function mapTracks(raw: RawTrack[]): Track[] {
@@ -80,11 +82,15 @@ function PlaylistMiniPlayer({
   playlistId,
   coverUrl,
   name,
+  displayName,
+  description,
   onBeforePlay,
 }: {
   playlistId: string;
   coverUrl: string;
   name: string;
+  displayName?: string;
+  description?: string;
   onBeforePlay: (audio: HTMLAudioElement) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -188,7 +194,8 @@ function PlaylistMiniPlayer({
           : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
         }
         <div className="playlist-mini__info">
-          <p className="playlist-mini__label">{name}</p>
+          <p className="playlist-mini__title">{displayName || name}</p>
+          {description && <p className="playlist-mini__desc">{description}</p>}
           <p className="playlist-mini__track">
             {loading ? "…" : curr?.title || "—"}
             {playing && <span className="now-shelf__dot ml-2 inline-block" />}
@@ -613,6 +620,8 @@ export default function Home() {
                   playlistId={pl.id}
                   coverUrl={pl.cover_url}
                   name={pl.name}
+                  displayName={pl.display_name}
+                  description={pl.description}
                   onBeforePlay={handleBeforePlay}
                 />
               ))}

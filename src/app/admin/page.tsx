@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 
 const ADMIN_KEY = "ts-admin-2026";
 
-type Playlist = { id: string; name: string; song_count: number; cover_url: string };
+type Playlist = { id: string; name: string; song_count: number; cover_url: string; display_name?: string; description?: string };
 type Track = {
   id: string;
   title: string;
@@ -32,6 +32,99 @@ const adminHeaders = {
   "Content-Type": "application/json",
   "X-Admin-Key": ADMIN_KEY,
 };
+
+function PlaylistSourceCard({
+  pl, onRemove, onSave, colors,
+}: {
+  pl: Playlist;
+  onRemove: (id: string) => void;
+  onSave: (id: string, display_name: string, description: string) => Promise<void>;
+  colors: { BORDER: string; CARD: string; PINK: string; TEXT: string; YELLOW: string; GREEN: string };
+}) {
+  const { BORDER, CARD, PINK, TEXT, YELLOW, GREEN } = colors;
+  const [displayName, setDisplayName] = useState(pl.display_name ?? "");
+  const [description, setDescription] = useState(pl.description ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    await onSave(pl.id, displayName, description);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  const dirty = displayName !== (pl.display_name ?? "") || description !== (pl.description ?? "");
+
+  return (
+    <div style={{ border: `1px solid ${BORDER}`, borderRadius: "0.75rem", background: CARD, overflow: "hidden" }}>
+      <div style={{ padding: "0.75rem 1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        {pl.cover_url
+          ? <img src={pl.cover_url} alt="" style={{ width: 46, height: 46, borderRadius: "0.375rem", objectFit: "cover", flexShrink: 0 }} />
+          : <div style={{ width: 46, height: 46, borderRadius: "0.375rem", background: "#2B2A28", flexShrink: 0 }} />
+        }
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 800, margin: "0 0 0.1rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "0.875rem" }}>
+            {pl.name}
+          </p>
+          <p style={{ fontSize: "0.7rem", opacity: 0.4, margin: 0 }}>{pl.song_count} tracks · {pl.id.slice(0, 8)}…</p>
+        </div>
+        <button
+          onClick={() => onRemove(pl.id)}
+          aria-label="Remove"
+          style={{
+            width: 28, height: 28, borderRadius: "50%",
+            border: `1px solid ${BORDER}`, background: "transparent",
+            color: PINK, cursor: "pointer", fontWeight: 900,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}
+        >✕</button>
+      </div>
+      <div style={{ padding: "0 1rem 0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem", borderTop: `1px solid ${BORDER}` }}>
+        <p style={{ margin: "0.5rem 0 0.25rem", fontSize: "0.65rem", opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          Display on site
+        </p>
+        <input
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value)}
+          placeholder={`Title (default: "${pl.name}")`}
+          style={{
+            padding: "0.4rem 0.6rem", background: "rgba(255,255,255,0.05)",
+            border: `1px solid ${BORDER}`, borderRadius: "0.375rem",
+            color: TEXT, fontSize: "0.85rem", width: "100%",
+          }}
+        />
+        <input
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="Description (optional)"
+          style={{
+            padding: "0.4rem 0.6rem", background: "rgba(255,255,255,0.05)",
+            border: `1px solid ${BORDER}`, borderRadius: "0.375rem",
+            color: TEXT, fontSize: "0.8rem", width: "100%",
+          }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.1rem" }}>
+          <button
+            onClick={save}
+            disabled={!dirty || saving}
+            style={{
+              padding: "0.3rem 0.8rem", borderRadius: "0.375rem", fontSize: "0.75rem", fontWeight: 700,
+              border: `1px solid ${dirty ? YELLOW : BORDER}`,
+              background: saved ? GREEN : dirty ? YELLOW : "transparent",
+              color: dirty || saved ? "#0F0D0B" : TEXT,
+              cursor: dirty ? "pointer" : "default", opacity: dirty || saved ? 1 : 0.4,
+              transition: "all 0.15s",
+            }}
+          >
+            {saved ? "Saved ✓" : saving ? "…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Admin() {
   const [tab, setTab] = useState<"mix" | "sources">("mix");
@@ -121,6 +214,15 @@ export default function Admin() {
   async function removeSource(id: string) {
     await fetch(`/api/playlists/${id}`, { method: "DELETE", headers: adminHeaders });
     if (selectedSource === id) { setSelectedSource(""); setSourceTracks([]); }
+    await loadSources();
+  }
+
+  async function updatePlaylistMeta(id: string, display_name: string, description: string) {
+    await fetch(`/api/playlists/${id}`, {
+      method: "PATCH",
+      headers: adminHeaders,
+      body: JSON.stringify({ display_name: display_name.trim(), description: description.trim() }),
+    });
     await loadSources();
   }
 
@@ -353,35 +455,13 @@ export default function Admin() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", maxWidth: 560 }}>
             {sources.map(pl => (
-              <div
+              <PlaylistSourceCard
                 key={pl.id}
-                style={{
-                  border: `1px solid ${BORDER}`, borderRadius: "0.75rem",
-                  padding: "0.75rem 1rem", display: "flex", gap: "0.75rem",
-                  alignItems: "center", background: CARD,
-                }}
-              >
-                {pl.cover_url
-                  ? <img src={pl.cover_url} alt="" style={{ width: 46, height: 46, borderRadius: "0.375rem", objectFit: "cover", flexShrink: 0 }} />
-                  : <div style={{ width: 46, height: 46, borderRadius: "0.375rem", background: "#2B2A28", flexShrink: 0 }} />
-                }
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontWeight: 800, margin: "0 0 0.15rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pl.name}</p>
-                  <p style={{ fontSize: "0.72rem", opacity: 0.4, margin: 0 }}>{pl.song_count} tracks · {pl.id.slice(0, 8)}…</p>
-                </div>
-                <button
-                  onClick={() => removeSource(pl.id)}
-                  aria-label="Remove"
-                  style={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    border: `1px solid ${BORDER}`, background: "transparent",
-                    color: PINK, cursor: "pointer", fontWeight: 900,
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
+                pl={pl}
+                onRemove={removeSource}
+                onSave={updatePlaylistMeta}
+                colors={{ BORDER, CARD, PINK, TEXT, YELLOW, GREEN }}
+              />
             ))}
             {sources.length === 0 && <p style={{ opacity: 0.35, fontSize: "0.875rem" }}>No sources yet.</p>}
           </div>

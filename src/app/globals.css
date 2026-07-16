@@ -646,6 +646,28 @@ body {
   margin-bottom: 0.15rem;
 }
 
+.playlist-mini__title {
+  font-family: var(--font-menu), Impact, sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  margin-bottom: 0.1rem;
+}
+
+.playlist-mini__desc {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.7rem;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.15rem;
+}
+
 .playlist-mini__track {
   font-family: var(--font-menu), Impact, sans-serif;
   font-size: 1rem;
