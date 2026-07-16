@@ -128,13 +128,13 @@ export default function Home() {
     <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
       {/* ── Header ─────────────────────────────── */}
       <header
-        className="rounded-xl flex items-center justify-between px-4 md:px-6 py-1.5 md:py-2"
+        className="rounded-xl relative flex items-center justify-between px-4 md:px-6 py-1.5 md:py-2"
         style={{ background: "var(--paper)" }}
       >
         <a href="#" className="flex items-center shrink-0 shine-wrap">
           <img src="/tracksnack-long.png" alt="TrackSnack" className="h-14 md:h-20 w-auto" />
         </a>
-        <nav className="hidden md:flex items-center gap-5 menu-type text-lg">
+        <nav className="hidden md:flex items-center gap-6 menu-type text-xl absolute left-1/2 -translate-x-1/2">
           <a href="#menu" className="hover:text-red">Menu</a>
           <a href="#fresh" className="hover:text-red">Fresh</a>
           <a href="#how" className="hover:text-red">How it works</a>
@@ -289,25 +289,6 @@ export default function Home() {
             <span /><span />
           </div>
 
-          {/* Floating stickers */}
-          <div
-            className="sticker text-6xl hidden md:block"
-            style={{ top: "-6%", left: "-15%", "--rot": "-10deg" } as React.CSSProperties}
-          >
-            🎸
-          </div>
-          <div
-            className="sticker text-6xl hidden md:block"
-            style={{ top: "10%", right: "-13%", "--rot": "12deg", animationDelay: "0.7s" } as React.CSSProperties}
-          >
-            🌭
-          </div>
-          <div
-            className="sticker text-5xl hidden md:block"
-            style={{ bottom: "18%", right: "-16%", "--rot": "-8deg", animationDelay: "1.3s" } as React.CSSProperties}
-          >
-            🎵
-          </div>
         </div>
       </section>
 
