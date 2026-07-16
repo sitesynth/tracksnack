@@ -408,6 +408,48 @@ body {
   justify-content: center;
 }
 
+.player-card__next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: rgba(22, 18, 16, 0.06);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  margin-top: 0.25rem;
+}
+.player-card__next:hover { background: rgba(22, 18, 16, 0.13); }
+
+.player-card__next-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  opacity: 0.4;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.player-card__next-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid var(--ink);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.player-card__next-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .player__like {
   display: flex;
   align-items: center;

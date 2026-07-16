@@ -82,6 +82,8 @@ export default function Home() {
   const [expanded, setExpanded] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [liked, setLiked] = useState<boolean[]>([]);
+  const [remaining, setRemaining] = useState<string>("");
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetch("/tracks.json")
@@ -95,14 +97,36 @@ export default function Home() {
           setLiked(data.map(() => false));
         }
       });
+    fetch("/api/likes")
+      .then(r => r.json())
+      .then(setLikeCounts)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !tracks.length) return;
     a.src = tracks[trackIdx]?.audioUrl ?? "";
+    setRemaining("");
     if (playing) a.play().catch(() => {});
   }, [trackIdx, tracks]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const fmt = (s: number) =>
+      `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    const onTime = () => {
+      if (isNaN(a.duration)) return;
+      setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
+    };
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onTime);
+    return () => {
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onTime);
+    };
+  }, []);
 
   useEffect(() => {
     const el = songTitleRef.current;
@@ -118,11 +142,22 @@ export default function Home() {
   }, [trackIdx, tracks, expanded]);
 
   function toggleLike(i: number) {
+    const trackId = tracks[i].id;
+    const delta = liked[i] ? -1 : 1;
+    setLikeCounts(prev => ({
+      ...prev,
+      [trackId]: Math.max(0, (prev[trackId] ?? 0) + delta),
+    }));
     setLiked(ls => {
       const nextLs = ls.map((v, j) => (j === i ? !v : v));
       try { localStorage.setItem("ts-likes", JSON.stringify(nextLs)); } catch {}
       return nextLs;
     });
+    fetch("/api/like", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackId, delta }),
+    }).catch(() => {});
   }
 
   const fadeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -183,7 +218,7 @@ export default function Home() {
   const prev = tracks[(trackIdx - 1 + n) % n];
   const curr = tracks[trackIdx];
   const next = tracks[(trackIdx + 1) % n];
-  const likeCount = (curr.likes ?? 0) + (liked[trackIdx] ? 1 : 0);
+  const likeCount = likeCounts[curr.id] ?? curr.likes;
 
   return (
     <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
@@ -299,7 +334,7 @@ export default function Home() {
                 </a>
                 <div className="player-card__meta">
                   <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
-                  <span className="chip" style={{ background: "var(--mint)" }}>⏱ {curr.duration}</span>
+                  <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
                 </div>
                 <div className="player__controls justify-center">
                   <button
@@ -331,6 +366,15 @@ export default function Home() {
                     {liked[trackIdx] ? "♥" : "♡"} {likeCount}
                   </button>
                 </div>
+                <button
+                  className="player-card__next"
+                  onClick={() => setTrackIdx((trackIdx + 1) % n)}
+                >
+                  <span className="player-card__next-label menu-type">next up</span>
+                  <img src={next.imageUrl} alt={next.title} className="player-card__next-img" />
+                  <span className="player-card__next-title">{next.title}</span>
+                  <span className="font-black opacity-40">›</span>
+                </button>
               </div>
             )}
 
