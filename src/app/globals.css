@@ -39,8 +39,12 @@
 * { box-sizing: border-box; }
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden; /* Safari ignores body overflow-x; must set on html too */
-  overscroll-behavior-x: none; /* block horizontal rubber-band / edge-swipe-back gesture */
+  /* iOS WebKit ignores overflow-x:hidden for touch panning — the page can
+     still be dragged sideways to off-screen content. clip removes the
+     horizontal scroll container entirely (iOS 16+); hidden is the fallback. */
+  overflow-x: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -49,6 +53,7 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
   width: 100%;
 }
@@ -300,6 +305,7 @@ body {
 .player__nav {
   -webkit-appearance: none;
   appearance: none;
+  flex-shrink: 0;
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
@@ -322,6 +328,7 @@ body {
 .player__play {
   -webkit-appearance: none;
   appearance: none;
+  flex-shrink: 0;
   width: 2.6rem;
   height: 2.6rem;
   border-radius: 50%;
@@ -595,6 +602,7 @@ body {
 }
 
 .playlist-mini {
+  position: relative;
   border: 2px solid var(--ink);
   border-radius: 1.25rem;
   overflow: hidden;
@@ -669,19 +677,20 @@ body {
 .playlist-mini__like {
   -webkit-appearance: none;
   appearance: none;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.2rem;
-  height: 2rem;
-  padding: 0 0.5rem;
-  margin-left: auto;
+  height: 1.8rem;
+  padding: 0 0.55rem;
   border-radius: 999px;
   border: 2px solid var(--ink);
   background: var(--cream-deep);
   font-size: 0.7rem;
   font-weight: 800;
   cursor: pointer;
-  flex-shrink: 0;
   transition: transform 0.15s, background 0.15s;
   box-shadow: 0 2px 0 0 rgba(22,18,16,0.5);
 }

@@ -213,6 +213,15 @@ function PlaylistMiniPlayer({
         ? <img src={displayCover} alt={name} className="playlist-mini__img" />
         : <div className="playlist-mini__img--empty" aria-hidden />
       }
+      {curr && (
+        <button
+          className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+          onClick={() => toggleLike(curr.id)}
+          aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+        >
+          {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+        </button>
+      )}
       <div className="playlist-mini__body">
         <div className="playlist-mini__labelRow">
           <p className="playlist-mini__label">{name}</p>
@@ -242,15 +251,6 @@ function PlaylistMiniPlayer({
             disabled={n < 2}
             aria-label="Next"
           >›</button>
-          {curr && (
-            <button
-              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-              onClick={() => toggleLike(curr.id)}
-              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-            >
-              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
-            </button>
-          )}
         </div>
       </div>
     </div>
