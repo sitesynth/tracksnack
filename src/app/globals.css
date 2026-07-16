@@ -504,9 +504,8 @@ body {
 /* ── Logo shine sweep ───────────────────────── */
 .shine-wrap {
   position: relative;
-  overflow: hidden;
-  /* Safari: clip-path forces GPU layer so overflow:hidden actually clips */
-  clip-path: inset(0);
+  overflow: clip;      /* clip (not hidden) — no scroll container created */
+  clip-path: inset(0); /* Safari: forces GPU layer so clipping is honored */
 }
 .shine-wrap::after {
   content: "";
@@ -528,13 +527,26 @@ body {
 
 /* ── Marquee ticker ─────────────────────────── */
 .marquee {
+  position: relative;
   overflow: hidden;
+  clip-path: inset(0);   /* Safari: forces GPU layer so overflow:hidden clips for real */
   white-space: nowrap;
+  /* height is driven by py-3 padding + line-height; keep it explicit so
+     the absolute-positioned track doesn't collapse the container */
+  min-height: 1.75rem;
 }
 .marquee__track {
+  /* absolute → out of flow → no scrollWidth contribution to parent */
+  position: absolute;
+  left: 0;
+  top: 0;
   display: inline-flex;
   align-items: center;
+  height: 100%;
+  /* Start at -50% so right edge = container right edge at t=0 (no overflow flash) */
+  transform: translateX(-50%);
   animation: marquee 28s linear infinite;
+  will-change: transform;
 }
 .marquee__item {
   display: inline-flex;
@@ -543,7 +555,8 @@ body {
   padding: 0 1.6rem;
 }
 @keyframes marquee {
-  to { transform: translateX(-50%); }
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(-100%); }
 }
 
 /* ── Floating stickers ──────────────────────── */

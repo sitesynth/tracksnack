@@ -20,15 +20,15 @@ const sans = Overpass({
 });
 
 export const metadata: Metadata = {
-  title: "TrackSnack — Fresh songs, cooked live.",
+  title: "TrackSnack — AI Music on Demand | Custom Songs in Minutes",
   description:
-    "The roadside music diner. You order a track in chat, we cook it in minutes and serve it live on air.",
+    "Order a custom AI song about anything — any topic, any genre, cooked live in minutes. Interactive music radio where the audience writes the menu.",
   icons: { icon: "/tracksnack.png" },
   openGraph: {
-    title: "TrackSnack — Fresh songs, cooked live.",
+    title: "TrackSnack — AI Music on Demand | Custom Songs in Minutes",
     description:
-      "The roadside music diner. Order a track, we cook it live in minutes.",
-    images: [{ url: "/og-image.jpg", width: 1200, height: 630 }],
+      "Order a custom AI song about anything — any topic, any genre, cooked live in minutes.",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 603 }],
   },
   twitter: {
     card: "summary_large_image",

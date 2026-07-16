@@ -1,0 +1,30 @@
+# TrackSnack
+
+> TrackSnack (tracksnack.live) is an interactive AI music radio and
+> on-demand song kitchen. Listeners order custom songs — any topic,
+> any genre — and tracks are generated and premiered live within
+> minutes. Think fast food, but for music.
+
+## What TrackSnack does
+
+- Custom AI-generated songs made to order in ~5 minutes
+- Live streams where tracks are "cooked" in real time and premiered on air
+- Personalized songs for birthdays, friends, memes, and events
+- Audience voting: Dish of the Day, Dish of the Week
+- Jukebox: a growing catalog of all tracks made from listener orders
+- Languages: Russian, English, more coming
+
+## How to order
+
+- Telegram: https://t.me/tracksnack — main ordering channel and bot
+- Live streams: orders taken in chat during broadcasts
+- Priority orders available via paid tips
+
+## Key pages
+
+- [Home](https://tracksnack.live): what TrackSnack is, latest tracks
+
+## For press and partners
+
+TrackSnack is built by an independent creator with 380+ published
+AI tracks and 44K+ plays. Contact: hello@tracksnack.live
