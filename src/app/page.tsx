@@ -14,12 +14,35 @@ type Track = {
   likes: number;
 };
 
+type RawTrack = {
+  id: string;
+  title: string;
+  audio_url: string;
+  image_url: string;
+  duration: number;
+};
+
 type Playlist = {
   id: string;
   name: string;
   song_count: number;
   cover_url: string;
 };
+
+function mapTracks(raw: RawTrack[]): Track[] {
+  return raw.map(t => ({
+    id: t.id,
+    title: t.title ?? "Untitled",
+    imageUrl: t.image_url ?? "",
+    audioUrl: t.audio_url ?? "",
+    duration: t.duration
+      ? `${Math.floor(t.duration / 60)}:${String(Math.floor(t.duration % 60)).padStart(2, "0")}`
+      : "",
+    genre: "",
+    sunoUrl: `https://suno.com/song/${t.id}`,
+    likes: 0,
+  }));
+}
 
 const AUTHOR = "Chef Miguel";
 
@@ -58,12 +81,11 @@ const MENU = [
   },
 ];
 
-
 const STEPS = [
   {
     n: "1",
     title: "Place your order",
-    desc: "Drop a topic + a genre in the chat. “A track about my cat, Rammstein style” — that's a valid order.",
+    desc: `Drop a topic + a genre in the chat. “A track about my cat, Rammstein style” — that's a valid order.`,
   },
   {
     n: "2",
@@ -81,8 +103,128 @@ function Road() {
   return <div className="road" aria-hidden />;
 }
 
+function PlaylistMiniPlayer({
+  playlistId,
+  coverUrl,
+  name,
+  onBeforePlay,
+}: {
+  playlistId: string;
+  coverUrl: string;
+  name: string;
+  onBeforePlay: (audio: HTMLAudioElement) => void;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [tracks, setTracks] = useState<RawTrack[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const shouldPlayRef = useRef(false);
+  const tracksLenRef = useRef(0);
+
+  useEffect(() => {
+    fetch(`/api/playlist-tracks/${playlistId}`)
+      .then(r => r.json())
+      .then(d => {
+        const arr = Array.isArray(d) ? d : [];
+        setTracks(arr);
+        tracksLenRef.current = arr.length;
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [playlistId]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () =>
+      setIdx(i => (i + 1) % Math.max(1, tracksLenRef.current));
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("ended", onEnded);
+    return () => {
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !tracks.length) return;
+    a.src = tracks[idx]?.audio_url ?? "";
+    if (shouldPlayRef.current) a.play().catch(() => {});
+  }, [idx, tracks]);
+
+  function toggle() {
+    const a = audioRef.current;
+    if (!a || !tracks.length) return;
+    if (playing) {
+      shouldPlayRef.current = false;
+      a.pause();
+    } else {
+      onBeforePlay(a);
+      shouldPlayRef.current = true;
+      a.play().catch(() => {});
+    }
+  }
+
+  function skip(dir: 1 | -1) {
+    const n = tracks.length;
+    if (n < 2) return;
+    shouldPlayRef.current = playing;
+    setIdx(i => (i + dir + n) % n);
+  }
+
+  const n = tracks.length;
+  const curr = tracks[idx];
+  const displayCover = coverUrl || curr?.image_url || "";
+
+  return (
+    <div className="playlist-mini">
+      <audio ref={audioRef} preload="none" />
+      {displayCover
+        ? <img src={displayCover} alt={name} className="playlist-mini__img" />
+        : <div className="playlist-mini__img--empty" aria-hidden />
+      }
+      <div className="playlist-mini__body">
+        <p className="playlist-mini__label">{name}</p>
+        <p className="playlist-mini__track">
+          {loading ? "…" : curr?.title || "—"}
+        </p>
+        <div className="playlist-mini__controls">
+          <button
+            className="player__nav"
+            onClick={() => skip(-1)}
+            disabled={n < 2}
+            aria-label="Previous"
+          >‹</button>
+          <button
+            className="player__play"
+            onClick={toggle}
+            disabled={n === 0 || loading}
+            aria-label={playing ? "Pause" : "Play"}
+          >{playing ? "❚❚" : "▶"}</button>
+          <button
+            className="player__nav"
+            onClick={() => skip(1)}
+            disabled={n < 2}
+            aria-label="Next"
+          >›</button>
+          {!loading && n > 0 && (
+            <span className="playlist-mini__count">{idx + 1}/{n}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const songTitleRef = useRef<HTMLSpanElement>(null);
   const nextTitleRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -93,57 +235,32 @@ export default function Home() {
   const [remaining, setRemaining] = useState<string>("");
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
 
-  type RawTrack = { id: string; title: string; audio_url: string; image_url: string; duration: number };
-  function mapTracks(raw: RawTrack[]): Track[] {
-    return raw.map(t => ({
-      id: t.id,
-      title: t.title ?? "Untitled",
-      imageUrl: t.image_url ?? "",
-      audioUrl: t.audio_url ?? "",
-      duration: t.duration
-        ? `${Math.floor(t.duration / 60)}:${String(Math.floor(t.duration % 60)).padStart(2, "0")}`
-        : "",
-      genre: "",
-      sunoUrl: `https://suno.com/song/${t.id}`,
-      likes: 0,
-    }));
-  }
-
-  async function switchToPlaylist(playlistId: string | null) {
-    const a = audioRef.current;
-    if (a && playing) { a.pause(); a.volume = 1; setPlaying(false); }
-    setTrackIdx(0);
-    setExpanded(false);
-    setActivePlaylistId(playlistId);
-
-    let raw: RawTrack[] = [];
-    if (playlistId) {
-      raw = await fetch(`/api/playlist-tracks/${playlistId}`).then(r => r.json()).catch(() => []);
-    } else {
-      // Back to main queue
-      const q = await fetch("/api/queue").then(r => r.json()).catch(() => []);
-      if (q.length > 0) { raw = q; }
-      else { setTracks(await fetch("/tracks.json").then(r => r.json()).catch(() => [])); return; }
+  // Pause any active mini-player before the main player starts
+  function handleBeforePlay(newAudio: HTMLAudioElement) {
+    const mainAudio = audioRef.current;
+    if (mainAudio && !mainAudio.paused) {
+      mainAudio.pause();
+      mainAudio.volume = 1;
+      setPlaying(false);
     }
-    const mapped = mapTracks(raw);
-    setTracks(mapped);
-    setLiked(mapped.map(() => false));
+    if (activeAudioRef.current && activeAudioRef.current !== newAudio && !activeAudioRef.current.paused) {
+      activeAudioRef.current.pause();
+    }
+    activeAudioRef.current = newAudio;
   }
 
   useEffect(() => {
     async function loadTracks() {
-      // Try the DJ queue first; fall back to tracks.json
       try {
         const qData = await fetch("/api/queue").then(r => r.json());
         if (Array.isArray(qData) && qData.length > 0) {
-          setTracks(mapTracks(qData));
-          setLiked(qData.map(() => false));
+          const mapped = mapTracks(qData);
+          setTracks(mapped);
+          setLiked(mapped.map(() => false));
           return;
         }
       } catch {}
-      // Fall back to static tracks.json
       const data: Track[] = await fetch("/tracks.json").then(r => r.json()).catch(() => []);
       setTracks(data);
       setLiked(data.map(() => false));
@@ -263,6 +380,10 @@ export default function Home() {
       setPlaying(false);
       fadeOut(a, 350);
     } else {
+      // Pause any active mini-player before starting main
+      if (activeAudioRef.current && !activeAudioRef.current.paused) {
+        activeAudioRef.current.pause();
+      }
       a.play().catch(() => {});
       fadeIn(a, 500);
       setPlaying(true);
@@ -487,39 +608,16 @@ export default function Home() {
 
           {playlists.length > 0 && (
             <div className="mt-10">
-              <div className="flex items-center gap-3 mb-4">
-                <p className="menu-type text-sm opacity-50">On the turntable</p>
-                {activePlaylistId && (
-                  <button
-                    onClick={() => switchToPlaylist(null)}
-                    className="menu-type text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: "var(--yellow)", color: "var(--ink)", border: "none", cursor: "pointer" }}
-                  >
-                    ← Main mix
-                  </button>
-                )}
-              </div>
+              <p className="menu-type text-sm opacity-50 mb-4">On the turntable</p>
               <div className="playlist-row">
                 {playlists.map(pl => (
-                  <button
+                  <PlaylistMiniPlayer
                     key={pl.id}
-                    onClick={() => switchToPlaylist(pl.id)}
-                    className="playlist-card"
-                    style={{
-                      outline: activePlaylistId === pl.id ? "3px solid var(--yellow)" : "none",
-                      outlineOffset: "2px",
-                      background: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {pl.cover_url
-                      ? <img src={pl.cover_url} alt={pl.name} className="playlist-card__cover" />
-                      : <div className="playlist-card__cover playlist-card__cover--empty" />
-                    }
-                    <p className="playlist-card__name">{pl.name}</p>
-                    <p className="playlist-card__count">{pl.song_count} tracks</p>
-                  </button>
+                    playlistId={pl.id}
+                    coverUrl={pl.cover_url}
+                    name={pl.name}
+                    onBeforePlay={handleBeforePlay}
+                  />
                 ))}
               </div>
             </div>

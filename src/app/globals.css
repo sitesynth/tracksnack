@@ -578,54 +578,81 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Playlist row (Tonight's menu) ─────────── */
+/* ── Playlist mini-player grid (Tonight's menu) ── */
 .playlist-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
   gap: 1rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-.playlist-row::-webkit-scrollbar { display: none; }
+@media (max-width: 400px) {
+  .playlist-row { grid-template-columns: 1fr 1fr; }
+}
 
-.playlist-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  width: 9rem;
-  text-decoration: none;
-  color: var(--ink);
-}
-.playlist-card:hover .playlist-card__cover {
-  transform: translateY(-2px);
-  box-shadow: 4px 6px 0 0 var(--ink);
-}
-.playlist-card__cover {
-  width: 9rem;
-  height: 9rem;
-  border-radius: 1rem;
+.playlist-mini {
   border: 2px solid var(--ink);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+.playlist-mini__img {
+  width: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
-  box-shadow: 3px 4px 0 0 var(--ink);
-  transition: transform 0.15s, box-shadow 0.15s;
   display: block;
 }
-.playlist-card__cover--empty {
+
+.playlist-mini__img--empty {
+  width: 100%;
+  aspect-ratio: 1;
   background: var(--cream-deep);
+  display: block;
 }
-.playlist-card__name {
+
+.playlist-mini__body {
+  padding: 0.75rem;
+}
+
+.playlist-mini__label {
   font-family: var(--font-menu), Impact, sans-serif;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  font-size: 0.65rem;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
+  opacity: 0.4;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-bottom: 0.25rem;
 }
-.playlist-card__count {
-  font-size: 0.7rem;
+
+.playlist-mini__track {
+  font-family: var(--font-menu), Impact, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  min-height: 1em;
+  margin-bottom: 0.5rem;
+}
+
+.playlist-mini__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.playlist-mini__count {
+  font-size: 0.6rem;
   font-weight: 700;
-  opacity: 0.45;
+  opacity: 0.3;
+  margin-left: auto;
+}
+
+/* ── Disable shine on mobile (GPU-costly on iOS) ── */
+@media (max-width: 767px) {
+  .shine-wrap::after { display: none; }
 }
