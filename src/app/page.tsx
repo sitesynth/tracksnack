@@ -93,45 +93,60 @@ export default function Home() {
   const [remaining, setRemaining] = useState<string>("");
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
+
+  type RawTrack = { id: string; title: string; audio_url: string; image_url: string; duration: number };
+  function mapTracks(raw: RawTrack[]): Track[] {
+    return raw.map(t => ({
+      id: t.id,
+      title: t.title ?? "Untitled",
+      imageUrl: t.image_url ?? "",
+      audioUrl: t.audio_url ?? "",
+      duration: t.duration
+        ? `${Math.floor(t.duration / 60)}:${String(Math.floor(t.duration % 60)).padStart(2, "0")}`
+        : "",
+      genre: "",
+      sunoUrl: `https://suno.com/song/${t.id}`,
+      likes: 0,
+    }));
+  }
+
+  async function switchToPlaylist(playlistId: string | null) {
+    const a = audioRef.current;
+    if (a && playing) { a.pause(); a.volume = 1; setPlaying(false); }
+    setTrackIdx(0);
+    setExpanded(false);
+    setActivePlaylistId(playlistId);
+
+    let raw: RawTrack[] = [];
+    if (playlistId) {
+      raw = await fetch(`/api/playlist-tracks/${playlistId}`).then(r => r.json()).catch(() => []);
+    } else {
+      // Back to main queue
+      const q = await fetch("/api/queue").then(r => r.json()).catch(() => []);
+      if (q.length > 0) { raw = q; }
+      else { setTracks(await fetch("/tracks.json").then(r => r.json()).catch(() => [])); return; }
+    }
+    const mapped = mapTracks(raw);
+    setTracks(mapped);
+    setLiked(mapped.map(() => false));
+  }
 
   useEffect(() => {
     async function loadTracks() {
       // Try the DJ queue first; fall back to tracks.json
       try {
-        const qRes = await fetch("/api/queue");
-        const qData = await qRes.json();
+        const qData = await fetch("/api/queue").then(r => r.json());
         if (Array.isArray(qData) && qData.length > 0) {
-          const mapped: Track[] = qData.map((t: { id: string; title: string; audio_url: string; image_url: string; duration: number }) => ({
-            id: t.id,
-            title: t.title ?? "Untitled",
-            imageUrl: t.image_url ?? "",
-            audioUrl: t.audio_url ?? "",
-            duration: t.duration
-              ? `${Math.floor(t.duration / 60)}:${String(Math.floor(t.duration % 60)).padStart(2, "0")}`
-              : "",
-            genre: "",
-            sunoUrl: `https://suno.com/song/${t.id}`,
-            likes: 0,
-          }));
-          setTracks(mapped);
-          try {
-            const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
-            setLiked(mapped.map((_, i) => !!saved[i]));
-          } catch {
-            setLiked(mapped.map(() => false));
-          }
+          setTracks(mapTracks(qData));
+          setLiked(qData.map(() => false));
           return;
         }
       } catch {}
       // Fall back to static tracks.json
       const data: Track[] = await fetch("/tracks.json").then(r => r.json()).catch(() => []);
       setTracks(data);
-      try {
-        const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
-        setLiked(data.map((_, i) => !!saved[i]));
-      } catch {
-        setLiked(data.map(() => false));
-      }
+      setLiked(data.map(() => false));
     }
     loadTracks();
     fetch("/api/likes")
@@ -472,15 +487,31 @@ export default function Home() {
 
           {playlists.length > 0 && (
             <div className="mt-10">
-              <p className="menu-type text-sm opacity-50 mb-4">On the turntable</p>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="menu-type text-sm opacity-50">On the turntable</p>
+                {activePlaylistId && (
+                  <button
+                    onClick={() => switchToPlaylist(null)}
+                    className="menu-type text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: "var(--yellow)", color: "var(--ink)", border: "none", cursor: "pointer" }}
+                  >
+                    ← Main mix
+                  </button>
+                )}
+              </div>
               <div className="playlist-row">
                 {playlists.map(pl => (
-                  <a
+                  <button
                     key={pl.id}
-                    href={`https://suno.com/playlist/${pl.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() => switchToPlaylist(pl.id)}
                     className="playlist-card"
+                    style={{
+                      outline: activePlaylistId === pl.id ? "3px solid var(--yellow)" : "none",
+                      outlineOffset: "2px",
+                      background: "none",
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
                   >
                     {pl.cover_url
                       ? <img src={pl.cover_url} alt={pl.name} className="playlist-card__cover" />
@@ -488,7 +519,7 @@ export default function Home() {
                     }
                     <p className="playlist-card__name">{pl.name}</p>
                     <p className="playlist-card__count">{pl.song_count} tracks</p>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

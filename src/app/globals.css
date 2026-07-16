@@ -505,22 +505,25 @@ body {
 .shine-wrap {
   position: relative;
   overflow: hidden;
+  /* Safari: clip-path forces GPU layer so overflow:hidden actually clips */
+  clip-path: inset(0);
 }
 .shine-wrap::after {
   content: "";
   position: absolute;
   top: -20%;
-  left: -60%;
+  left: 0;          /* fixed; motion is via transform only — no layout overflow */
   width: 35%;
   height: 140%;
   background: linear-gradient(75deg, transparent 0%, rgba(255,255,255,0.9) 50%, transparent 100%);
-  transform: skewX(-20deg);
+  transform: skewX(-20deg) translateX(-300%);
+  will-change: transform;
   animation: shine-sweep 10s ease-in-out infinite;
 }
 @keyframes shine-sweep {
-  0%   { left: -60%; }
-  9%   { left: 130%; }
-  100% { left: 130%; }
+  0%   { transform: skewX(-20deg) translateX(-300%); }
+  9%   { transform: skewX(-20deg) translateX(400%); }
+  100% { transform: skewX(-20deg) translateX(400%); }
 }
 
 /* ── Marquee ticker ─────────────────────────── */
