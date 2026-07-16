@@ -28,7 +28,11 @@ export const metadata: Metadata = {
     title: "TrackSnack — Fresh songs, cooked live.",
     description:
       "The roadside music diner. Order a track, we cook it live in minutes.",
-    images: ["/tracksnack.png"],
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.jpg"],
   },
 };
 

@@ -95,17 +95,45 @@ export default function Home() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
-    fetch("/tracks.json")
-      .then(r => r.json())
-      .then((data: Track[]) => {
-        setTracks(data);
-        try {
-          const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
-          setLiked(data.map((_, i) => !!saved[i]));
-        } catch {
-          setLiked(data.map(() => false));
+    async function loadTracks() {
+      // Try the DJ queue first; fall back to tracks.json
+      try {
+        const qRes = await fetch("/api/queue");
+        const qData = await qRes.json();
+        if (Array.isArray(qData) && qData.length > 0) {
+          const mapped: Track[] = qData.map((t: { id: string; title: string; audio_url: string; image_url: string; duration: number }) => ({
+            id: t.id,
+            title: t.title ?? "Untitled",
+            imageUrl: t.image_url ?? "",
+            audioUrl: t.audio_url ?? "",
+            duration: t.duration
+              ? `${Math.floor(t.duration / 60)}:${String(Math.floor(t.duration % 60)).padStart(2, "0")}`
+              : "",
+            genre: "",
+            sunoUrl: `https://suno.com/song/${t.id}`,
+            likes: 0,
+          }));
+          setTracks(mapped);
+          try {
+            const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
+            setLiked(mapped.map((_, i) => !!saved[i]));
+          } catch {
+            setLiked(mapped.map(() => false));
+          }
+          return;
         }
-      });
+      } catch {}
+      // Fall back to static tracks.json
+      const data: Track[] = await fetch("/tracks.json").then(r => r.json()).catch(() => []);
+      setTracks(data);
+      try {
+        const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
+        setLiked(data.map((_, i) => !!saved[i]));
+      } catch {
+        setLiked(data.map(() => false));
+      }
+    }
+    loadTracks();
     fetch("/api/likes")
       .then(r => r.json())
       .then(setLikeCounts)
