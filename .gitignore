@@ -1,10 +1,11 @@
 .next/
 node_modules/
-*.avif
-*.png
-*.lottie
 out/
 .env*
 tracksnack-idea.md
 .claude/
-vinyl.svg
+# root-level source images (not needed in deploy)
+/*.avif
+/*.png
+/*.lottie
+/vinyl.svg
