@@ -14,6 +14,13 @@ type Track = {
   likes: number;
 };
 
+type Playlist = {
+  id: string;
+  name: string;
+  song_count: number;
+  cover_url: string;
+};
+
 const AUTHOR = "Chef Miguel";
 
 const TICKER = [
@@ -85,6 +92,7 @@ export default function Home() {
   const [liked, setLiked] = useState<boolean[]>([]);
   const [remaining, setRemaining] = useState<string>("");
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
     fetch("/tracks.json")
@@ -101,6 +109,10 @@ export default function Home() {
     fetch("/api/likes")
       .then(r => r.json())
       .then(setLikeCounts)
+      .catch(() => {});
+    fetch("/api/playlists")
+      .then(r => r.json())
+      .then(setPlaylists)
       .catch(() => {});
   }, []);
 
@@ -246,7 +258,7 @@ export default function Home() {
         className="rounded-xl overflow-hidden px-4 md:px-8 pt-10 md:pt-16 pb-0"
         style={{ background: "linear-gradient(180deg, var(--dusk-1) 0%, var(--dusk-2) 70%, #23201E 100%)" }}
       >
-        <div className="max-w-3xl mx-auto relative fade-up">
+        <div className="w-full max-w-3xl mx-auto relative fade-up">
           <div className="billboard bulbs px-6 md:px-14 pt-10 pb-9 md:pt-12 md:pb-11 text-center">
             <span
               className="neon absolute top-5 right-6 text-sm md:text-base"
@@ -429,6 +441,30 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {playlists.length > 0 && (
+            <div className="mt-10">
+              <p className="menu-type text-sm opacity-50 mb-4">On the turntable</p>
+              <div className="playlist-row">
+                {playlists.map(pl => (
+                  <a
+                    key={pl.id}
+                    href={`https://suno.com/playlist/${pl.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="playlist-card"
+                  >
+                    {pl.cover_url
+                      ? <img src={pl.cover_url} alt={pl.name} className="playlist-card__cover" />
+                      : <div className="playlist-card__cover playlist-card__cover--empty" />
+                    }
+                    <p className="playlist-card__name">{pl.name}</p>
+                    <p className="playlist-card__count">{pl.song_count} tracks</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
