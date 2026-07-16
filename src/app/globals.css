@@ -254,6 +254,20 @@ body {
   letter-spacing: 0.04em;
   font-size: 1.15rem;
   line-height: 1.1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.player__song-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+.player__song-text.scrolling {
+  animation: song-scroll 9s ease-in-out infinite;
+}
+@keyframes song-scroll {
+  0%, 15%  { transform: translateX(0); }
+  65%, 80% { transform: translateX(var(--sx, 0px)); }
+  81%, 100% { transform: translateX(0); }
 }
 .player__author {
   font-family: var(--font-sans), system-ui, sans-serif;

@@ -76,6 +76,7 @@ function Road() {
 
 export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const songTitleRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(false);
   const [trackIdx, setTrackIdx] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -102,6 +103,19 @@ export default function Home() {
     a.src = tracks[trackIdx]?.audioUrl ?? "";
     if (playing) a.play().catch(() => {});
   }, [trackIdx, tracks]);
+
+  useEffect(() => {
+    const el = songTitleRef.current;
+    if (!el) return;
+    const overflow = el.scrollWidth - (el.parentElement?.clientWidth ?? 0);
+    if (overflow > 4) {
+      el.style.setProperty("--sx", `-${overflow}px`);
+      el.classList.add("scrolling");
+    } else {
+      el.style.removeProperty("--sx");
+      el.classList.remove("scrolling");
+    }
+  }, [trackIdx, tracks, expanded]);
 
   function toggleLike(i: number) {
     setLiked(ls => {
@@ -203,8 +217,8 @@ export default function Home() {
                   <img src={curr.imageUrl} alt={curr.title} className="w-full h-full object-cover" />
                 </button>
                 <button className="player__info text-left" onClick={() => setExpanded(true)}>
-                  <p className="player__song truncate">
-                    {curr.title}
+                  <p className="player__song">
+                    <span ref={songTitleRef} className="player__song-text">{curr.title}</span>
                     {playing && <span className="now-shelf__dot ml-2 inline-block" />}
                   </p>
                   <p className="player__author truncate">{AUTHOR}</p>
