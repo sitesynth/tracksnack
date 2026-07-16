@@ -183,7 +183,7 @@ function PlaylistMiniPlayer({
 
   const n = tracks.length;
   const curr = tracks[idx];
-  const displayCover = coverUrl || curr?.image_url || "";
+  const displayCover = curr?.image_url || coverUrl || "";
 
   return (
     <div className="playlist-mini">
