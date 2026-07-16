@@ -54,33 +54,6 @@ const TICKER = [
   "NOW COOKING: psychedelic funk burger 🍔",
 ];
 
-const MENU = [
-  {
-    name: "Dish of the Day",
-    desc: "One genre rules the whole show. Every order gets cooked in today's flavor.",
-    chip: "Daily special",
-    chipBg: "var(--yellow)",
-  },
-  {
-    name: "Extra Spicy",
-    desc: "Every half hour we grab the wildest, weirdest order in chat and cook it anyway.",
-    chip: "Hot 🔥",
-    chipBg: "var(--pink)",
-  },
-  {
-    name: "Combo",
-    desc: "Chat picks two genres that should never meet. We put them in one bun.",
-    chip: "2-in-1",
-    chipBg: "var(--violet)",
-  },
-  {
-    name: "Blind Tasting",
-    desc: "We play a fresh track — you guess what the order was. Winner picks the next dish.",
-    chip: "Game",
-    chipBg: "var(--mint)",
-  },
-];
-
 const STEPS = [
   {
     n: "1",
@@ -209,49 +182,50 @@ function PlaylistMiniPlayer({
   return (
     <div className="playlist-mini">
       <audio ref={audioRef} preload="none" />
-      {displayCover
-        ? <img src={displayCover} alt={name} className="playlist-mini__img" />
-        : <div className="playlist-mini__img--empty" aria-hidden />
-      }
-      {curr && (
-        <button
-          className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-          onClick={() => toggleLike(curr.id)}
-          aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-        >
-          {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
-        </button>
-      )}
-      <div className="playlist-mini__body">
-        <div className="playlist-mini__labelRow">
+      <div className="playlist-mini__top">
+        {displayCover
+          ? <img src={displayCover} alt={name} className="playlist-mini__thumb" />
+          : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
+        }
+        <div className="playlist-mini__info">
           <p className="playlist-mini__label">{name}</p>
-          {!loading && n > 0 && (
-            <span className="playlist-mini__count">{idx + 1}/{n}</span>
-          )}
+          <p className="playlist-mini__track">
+            {loading ? "…" : curr?.title || "—"}
+            {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+          </p>
         </div>
-        <p className="playlist-mini__track">
-          {loading ? "…" : curr?.title || "—"}
-        </p>
-        <div className="playlist-mini__controls">
+      </div>
+      <div className="playlist-mini__controls">
+        <button
+          className="player__nav"
+          onClick={() => skip(-1)}
+          disabled={n < 2}
+          aria-label="Previous"
+        >‹</button>
+        <button
+          className="player__play"
+          onClick={toggle}
+          disabled={n === 0 || loading}
+          aria-label={playing ? "Pause" : "Play"}
+        >{playing ? "❚❚" : "▶"}</button>
+        <button
+          className="player__nav"
+          onClick={() => skip(1)}
+          disabled={n < 2}
+          aria-label="Next"
+        >›</button>
+        {!loading && n > 0 && (
+          <span className="playlist-mini__count">{idx + 1}/{n}</span>
+        )}
+        {curr && (
           <button
-            className="player__nav"
-            onClick={() => skip(-1)}
-            disabled={n < 2}
-            aria-label="Previous"
-          >‹</button>
-          <button
-            className="player__play"
-            onClick={toggle}
-            disabled={n === 0 || loading}
-            aria-label={playing ? "Pause" : "Play"}
-          >{playing ? "❚❚" : "▶"}</button>
-          <button
-            className="player__nav"
-            onClick={() => skip(1)}
-            disabled={n < 2}
-            aria-label="Next"
-          >›</button>
-        </div>
+            className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+            onClick={() => toggleLike(curr.id)}
+            aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+          >
+            {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -466,7 +440,7 @@ export default function Home() {
               OPEN 24/7
             </span>
             <audio ref={audioRef} preload="none" />
-            <div className="relative aspect-square w-80 md:w-[26rem] mx-auto mb-6">
+            <div className="relative aspect-square w-full max-w-80 md:max-w-[26rem] mx-auto mb-6">
               <div className="absolute inset-[6%] rounded-full overflow-hidden">
                 <img
                   src="/vinyl.svg"
@@ -630,32 +604,21 @@ export default function Home() {
       <section id="menu" className="rounded-xl px-5 md:px-12 py-12 md:py-16" style={{ background: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
           <h2 className="display text-3xl md:text-5xl mb-2">Tonight&apos;s menu</h2>
-          <p className="font-semibold opacity-70 mb-8">Every dish is a live segment. Every order is cooked on air.</p>
-          <div className="grid sm:grid-cols-2 gap-4 md:gap-6">
-            {MENU.map((m) => (
-              <div key={m.name} className="panel">
-                <span className="chip mb-3" style={{ background: m.chipBg }}>{m.chip}</span>
-                <h3 className="display text-xl md:text-2xl mb-2">{m.name}</h3>
-                <p className="font-medium opacity-75 text-sm md:text-base">{m.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {playlists.length > 0 && (
-            <div className="mt-10">
-              <p className="menu-type text-sm opacity-50 mb-4">On the turntable</p>
-              <div className="playlist-row">
-                {playlists.map(pl => (
-                  <PlaylistMiniPlayer
-                    key={pl.id}
-                    playlistId={pl.id}
-                    coverUrl={pl.cover_url}
-                    name={pl.name}
-                    onBeforePlay={handleBeforePlay}
-                  />
-                ))}
-              </div>
+          <p className="font-semibold opacity-70 mb-8">Thematic playlists from the kitchen — each one plays right here.</p>
+          {playlists.length > 0 ? (
+            <div className="playlist-row">
+              {playlists.map(pl => (
+                <PlaylistMiniPlayer
+                  key={pl.id}
+                  playlistId={pl.id}
+                  coverUrl={pl.cover_url}
+                  name={pl.name}
+                  onBeforePlay={handleBeforePlay}
+                />
+              ))}
             </div>
+          ) : (
+            <p className="font-medium opacity-40">The menu is being written…</p>
           )}
         </div>
       </section>
