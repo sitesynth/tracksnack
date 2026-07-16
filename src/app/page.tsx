@@ -3,7 +3,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const STREAM_URL = "/sample.mp3";
+type Track = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  audioUrl: string;
+  duration: string;
+  genre: string;
+  sunoUrl: string;
+  likes: number;
+};
+
+const AUTHOR = "Chef Miguel";
 
 const TICKER = [
   "NOW COOKING: opera about shawarma 🌯",
@@ -40,16 +51,6 @@ const MENU = [
   },
 ];
 
-const SUNO_PROFILE = "https://suno.com/@miguel2020";
-
-const FRESH = [
-  { title: "Shawarma Opera", author: "Chef Miguel", genre: "opera × street food", emoji: "🌯", duration: "3:12", likes: 42, sunoUrl: SUNO_PROFILE },
-  { title: "Hard Bass Monday", author: "Chef Miguel", genre: "hardbass", emoji: "🧱", duration: "2:48", likes: 37, sunoUrl: SUNO_PROFILE },
-  { title: "Disco Mother-in-Law", author: "Chef Miguel", genre: "disco", emoji: "🪩", duration: "3:35", likes: 58, sunoUrl: SUNO_PROFILE },
-  { title: "Funk Burger Deluxe", author: "Chef Miguel", genre: "psychedelic funk", emoji: "🍔", duration: "4:02", likes: 24, sunoUrl: SUNO_PROFILE },
-  { title: "Midnight Truck Stop", author: "Chef Miguel", genre: "country blues", emoji: "🚚", duration: "3:21", likes: 31, sunoUrl: SUNO_PROFILE },
-  { title: "Neon Milkshake", author: "Chef Miguel", genre: "synthwave", emoji: "🥤", duration: "2:59", likes: 45, sunoUrl: SUNO_PROFILE },
-];
 
 const STEPS = [
   {
@@ -78,14 +79,29 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [trackIdx, setTrackIdx] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [liked, setLiked] = useState<boolean[]>(() => FRESH.map(() => false));
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [liked, setLiked] = useState<boolean[]>([]);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
-      if (Array.isArray(saved)) setLiked(FRESH.map((_, i) => !!saved[i]));
-    } catch {}
+    fetch("/tracks.json")
+      .then(r => r.json())
+      .then((data: Track[]) => {
+        setTracks(data);
+        try {
+          const saved = JSON.parse(localStorage.getItem("ts-likes") ?? "[]");
+          setLiked(data.map((_, i) => !!saved[i]));
+        } catch {
+          setLiked(data.map(() => false));
+        }
+      });
   }, []);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !tracks.length) return;
+    a.src = tracks[trackIdx]?.audioUrl ?? "";
+    if (playing) a.play().catch(() => {});
+  }, [trackIdx, tracks]);
 
   function toggleLike(i: number) {
     setLiked(ls => {
@@ -95,11 +111,6 @@ export default function Home() {
     });
   }
 
-  const prev = FRESH[(trackIdx - 1 + FRESH.length) % FRESH.length];
-  const curr = FRESH[trackIdx];
-  const next = FRESH[(trackIdx + 1) % FRESH.length];
-  const likeCount = curr.likes + (liked[trackIdx] ? 1 : 0);
-
   const touchX = useRef(0);
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX;
@@ -107,11 +118,11 @@ export default function Home() {
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
     const dx = e.changedTouches[0].clientX - touchX.current;
     if (Math.abs(dx) < 40) return;
-    setTrackIdx(i => dx < 0
-      ? (i + 1) % FRESH.length
-      : (i - 1 + FRESH.length) % FRESH.length
-    );
-  }, []);
+    setTrackIdx(i => {
+      const len = tracks.length || 1;
+      return dx < 0 ? (i + 1) % len : (i - 1 + len) % len;
+    });
+  }, [tracks.length]);
 
   function toggle() {
     const a = audioRef.current;
@@ -123,6 +134,14 @@ export default function Home() {
       setPlaying(true);
     }
   }
+
+  if (!tracks.length) return null;
+
+  const n = tracks.length;
+  const prev = tracks[(trackIdx - 1 + n) % n];
+  const curr = tracks[trackIdx];
+  const next = tracks[(trackIdx + 1) % n];
+  const likeCount = (curr.likes ?? 0) + (liked[trackIdx] ? 1 : 0);
 
   return (
     <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
@@ -156,7 +175,7 @@ export default function Home() {
             >
               OPEN 24/7
             </span>
-            <audio ref={audioRef} src={STREAM_URL} preload="none" />
+            <audio ref={audioRef} preload="none" />
             <div className="relative aspect-square w-80 md:w-[26rem] mx-auto mb-6">
               <div className="absolute inset-[6%] rounded-full overflow-hidden">
                 <img
@@ -177,22 +196,22 @@ export default function Home() {
             {!expanded ? (
               <div className="player mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 <button
-                  className="player__cover"
+                  className="player__cover overflow-hidden"
                   onClick={() => setExpanded(true)}
                   aria-label="Show track details"
                 >
-                  {curr.emoji}
+                  <img src={curr.imageUrl} alt={curr.title} className="w-full h-full object-cover" />
                 </button>
                 <button className="player__info text-left" onClick={() => setExpanded(true)}>
                   <p className="player__song truncate">
                     {curr.title}
                     {playing && <span className="now-shelf__dot ml-2 inline-block" />}
                   </p>
-                  <p className="player__author truncate">{curr.author}</p>
+                  <p className="player__author truncate">{AUTHOR}</p>
                 </button>
                 <div className="player__controls">
                   <button
-                    onClick={() => setTrackIdx((trackIdx - 1 + FRESH.length) % FRESH.length)}
+                    onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
                     className="player__nav"
                     aria-label={`Previous: ${prev.title}`}
                   >
@@ -206,7 +225,7 @@ export default function Home() {
                     {playing ? "❚❚" : "▶"}
                   </button>
                   <button
-                    onClick={() => setTrackIdx((trackIdx + 1) % FRESH.length)}
+                    onClick={() => setTrackIdx((trackIdx + 1) % n)}
                     className="player__nav"
                     aria-label={`Next: ${next.title}`}
                   >
@@ -223,7 +242,7 @@ export default function Home() {
                 >
                   ×
                 </button>
-                <span className="player-card__cover">{curr.emoji}</span>
+                <img src={curr.imageUrl} alt={curr.title} className="player-card__cover object-cover" />
                 <p className="player-card__song">
                   {curr.title}
                   {playing && <span className="now-shelf__dot ml-2 inline-block" />}
@@ -234,7 +253,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   className="player-card__author"
                 >
-                  {curr.author} ↗
+                  {AUTHOR} ↗
                 </a>
                 <div className="player-card__meta">
                   <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
@@ -242,7 +261,7 @@ export default function Home() {
                 </div>
                 <div className="player__controls justify-center">
                   <button
-                    onClick={() => setTrackIdx((trackIdx - 1 + FRESH.length) % FRESH.length)}
+                    onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
                     className="player__nav"
                     aria-label={`Previous: ${prev.title}`}
                   >
@@ -256,7 +275,7 @@ export default function Home() {
                     {playing ? "❚❚" : "▶"}
                   </button>
                   <button
-                    onClick={() => setTrackIdx((trackIdx + 1) % FRESH.length)}
+                    onClick={() => setTrackIdx((trackIdx + 1) % n)}
                     className="player__nav"
                     aria-label={`Next: ${next.title}`}
                   >
@@ -332,20 +351,21 @@ export default function Home() {
             Picked from a 382-track pantry. Tap to taste.
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {FRESH.map((t) => (
-              <div key={t.title} className="panel flex items-center gap-4 !p-4">
-                <span
-                  className="flex items-center justify-center text-3xl w-14 h-14 rounded-xl border-2 shrink-0"
-                  style={{ borderColor: "var(--ink)", background: "var(--cream-deep)" }}
-                >
-                  {t.emoji}
-                </span>
+            {tracks.slice(0, 6).map((t, i) => (
+              <div key={t.id} className="panel flex items-center gap-4 !p-4">
+                <img
+                  src={t.imageUrl}
+                  alt={t.title}
+                  className="w-14 h-14 rounded-xl border-2 shrink-0 object-cover"
+                  style={{ borderColor: "var(--ink)" }}
+                />
                 <div className="min-w-0">
                   <p className="display text-base truncate">{t.title}</p>
                   <p className="menu-type text-sm opacity-60">{t.genre}</p>
                 </div>
                 <button
                   aria-label={`Play ${t.title}`}
+                  onClick={() => { setTrackIdx(i); setExpanded(false); if (!playing) toggle(); }}
                   className="ml-auto w-10 h-10 rounded-full border-2 shrink-0 font-black"
                   style={{ borderColor: "var(--ink)", background: "var(--yellow)", boxShadow: "0 3px 0 0 var(--ink)" }}
                 >
