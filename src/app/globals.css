@@ -620,6 +620,13 @@ body {
   padding: 0.75rem;
 }
 
+.playlist-mini__labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
 .playlist-mini__label {
   font-family: var(--font-menu), Impact, sans-serif;
   font-size: 0.65rem;
@@ -629,7 +636,8 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.25rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .playlist-mini__track {
@@ -655,7 +663,32 @@ body {
   font-size: 0.6rem;
   font-weight: 700;
   opacity: 0.3;
+  flex-shrink: 0;
+}
+
+.playlist-mini__like {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
   margin-left: auto;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--cream-deep);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 2px 0 0 rgba(22,18,16,0.5);
+}
+.playlist-mini__like:active { transform: scale(0.94); }
+.playlist-mini__like.is-liked {
+  background: var(--pink);
+  color: var(--ink);
 }
 
 /* ── Disable shine on mobile (GPU-costly on iOS) ── */

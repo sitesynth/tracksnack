@@ -119,6 +119,8 @@ function PlaylistMiniPlayer({
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const shouldPlayRef = useRef(false);
   const tracksLenRef = useRef(0);
 
@@ -132,7 +134,29 @@ function PlaylistMiniPlayer({
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch("/api/likes").then(r => r.json()).then(setLikeCounts).catch(() => {});
+    try {
+      const raw = localStorage.getItem("ts-liked-ids");
+      if (raw) setLikedIds(new Set(JSON.parse(raw)));
+    } catch {}
   }, [playlistId]);
+
+  function toggleLike(trackId: string) {
+    const wasLiked = likedIds.has(trackId);
+    const delta = wasLiked ? -1 : 1;
+    setLikeCounts(prev => ({ ...prev, [trackId]: Math.max(0, (prev[trackId] ?? 0) + delta) }));
+    setLikedIds(prev => {
+      const next = new Set(prev);
+      wasLiked ? next.delete(trackId) : next.add(trackId);
+      try { localStorage.setItem("ts-liked-ids", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+    fetch("/api/like", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackId, delta }),
+    }).catch(() => {});
+  }
 
   useEffect(() => {
     const a = audioRef.current;
@@ -190,7 +214,12 @@ function PlaylistMiniPlayer({
         : <div className="playlist-mini__img--empty" aria-hidden />
       }
       <div className="playlist-mini__body">
-        <p className="playlist-mini__label">{name}</p>
+        <div className="playlist-mini__labelRow">
+          <p className="playlist-mini__label">{name}</p>
+          {!loading && n > 0 && (
+            <span className="playlist-mini__count">{idx + 1}/{n}</span>
+          )}
+        </div>
         <p className="playlist-mini__track">
           {loading ? "…" : curr?.title || "—"}
         </p>
@@ -213,8 +242,14 @@ function PlaylistMiniPlayer({
             disabled={n < 2}
             aria-label="Next"
           >›</button>
-          {!loading && n > 0 && (
-            <span className="playlist-mini__count">{idx + 1}/{n}</span>
+          {curr && (
+            <button
+              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+              onClick={() => toggleLike(curr.id)}
+              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+            >
+              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+            </button>
           )}
         </div>
       </div>
