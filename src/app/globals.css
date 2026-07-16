@@ -40,6 +40,7 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden; /* Safari ignores body overflow-x; must set on html too */
+  overscroll-behavior-x: none; /* block horizontal rubber-band / edge-swipe-back gesture */
 }
 
 body {
@@ -48,6 +49,7 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   width: 100%;
 }
 
@@ -232,6 +234,9 @@ body {
   width: 100%;
   max-width: 24rem;
   text-align: left;
+  /* horizontal swipe is handled in JS — stop the browser's own horizontal
+     gesture recognizer (edge-swipe-back on Safari/Chrome) from firing too */
+  touch-action: pan-y;
 }
 
 .player__cover {
@@ -352,6 +357,7 @@ body {
   width: 100%;
   max-width: 19rem;
   animation: fadeUp 0.25s ease-out both;
+  touch-action: pan-y;
 }
 
 .player-card__close {
