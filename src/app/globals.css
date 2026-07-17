@@ -882,6 +882,7 @@ body {
   padding: 0.75rem;
   max-height: 16rem;
   overflow-y: auto;
+  text-align: left;
 }
 .comments-form {
   display: flex;
@@ -921,10 +922,10 @@ body {
   margin: 0.5rem 0 0;
 }
 .comments-item {
-  padding: 0.4rem 0;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  padding: 0.5rem 0;
+  border-top: 1.5px solid rgba(0,0,0,0.15);
+  text-align: left;
 }
-.comments-item:first-of-type { border-top: none; }
 .comments-name {
   font-weight: 800;
   font-size: 0.75rem;
