@@ -480,13 +480,29 @@ body {
 }
 .player-card__next-title {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   font-weight: 700;
   font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.player-card__next-title .player__song-text {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+}
+.player-card__next-author {
+  display: block;
+  font-weight: 600;
+  font-size: 9px;
+  opacity: 0.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
 }
 
 .player__like {

@@ -686,6 +686,7 @@ function PlaylistMiniPlayer({
   const croppedCover = useCroppedCover(displayCover || undefined);
   const croppedNext = useCroppedCover(nextTrack?.image_url || undefined);
   const currMeta = useTrackMeta(curr?.id);
+  const nextMeta = useTrackMeta(nextTrack?.id);
   const genre = currMeta ? genreLabel(currMeta.tags) : "";
 
   const miniCard = (
@@ -788,7 +789,10 @@ function PlaylistMiniPlayer({
               <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
                 <span className="player-card__next-label menu-type">next up</span>
                 {nextTrack.image_url && <img src={croppedNext || nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
-                <span className="player-card__next-title"><span className="player__song-text">{nextTrack.title}</span></span>
+                <span className="player-card__next-title">
+                  <span className="player__song-text">{nextTrack.title}</span>
+                  {nextMeta?.artist && <span className="player-card__next-author">{nextMeta.artist}</span>}
+                </span>
                 <span className="font-black opacity-40">›</span>
               </button>
             )}
@@ -857,7 +861,10 @@ function PlaylistMiniPlayer({
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
               <span className="player-card__next-label menu-type">next up</span>
               {nextTrack.image_url && <img src={croppedNext || nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
-              <span className="player-card__next-title"><span className="player__song-text">{nextTrack.title}</span></span>
+              <span className="player-card__next-title">
+                <span className="player__song-text">{nextTrack.title}</span>
+                {nextMeta?.artist && <span className="player-card__next-author">{nextMeta.artist}</span>}
+              </span>
               <span className="font-black opacity-40">›</span>
             </button>
           )}
@@ -1098,6 +1105,7 @@ export default function Home() {
   const currCover = useCroppedCover(tracks[trackIdx]?.imageUrl);
   const nextCover = useCroppedCover(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.imageUrl : undefined);
   const currMeta = useTrackMeta(tracks[trackIdx]?.id);
+  const nextMeta = useTrackMeta(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.id : undefined);
 
   if (!tracks.length) return null;
 
@@ -1162,7 +1170,10 @@ export default function Home() {
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
               <img src={nextCover || next.imageUrl} alt={next.title} className="player-card__next-img" />
-              <span className="player-card__next-title"><span className="player__song-text">{next.title}</span></span>
+              <span className="player-card__next-title">
+                <span className="player__song-text">{next.title}</span>
+                <span className="player-card__next-author">{nextMeta?.artist || AUTHOR}</span>
+              </span>
               <span className="font-black opacity-40">›</span>
             </button>
             <TrackComments trackId={curr.id} />
@@ -1333,7 +1344,10 @@ export default function Home() {
                   >
                     <span className="player-card__next-label menu-type">next up</span>
                     <img src={nextCover || next.imageUrl} alt={next.title} className="player-card__next-img" />
-                    <span className="player-card__next-title"><span ref={nextTitleRef} className="player__song-text">{next.title}</span></span>
+                    <span className="player-card__next-title">
+                      <span ref={nextTitleRef} className="player__song-text">{next.title}</span>
+                      <span className="player-card__next-author">{nextMeta?.artist || AUTHOR}</span>
+                    </span>
                     <span className="font-black opacity-40">›</span>
                   </button>
                   <TrackComments trackId={curr.id} />
