@@ -256,6 +256,35 @@ function SunoSearch({
     }
     setTracks(all);
     setLoadingMore(false);
+    return all;
+  }
+
+  async function loadAllAndAdd() {
+    setLoadingMore(true);
+    let all: Track[] = [];
+    if (userHandle) {
+      all = await loadAllUserTracks(userHandle);
+    } else {
+      // song/tag search — paginate via index
+      all = [...tracks];
+      let idx = index + 20;
+      while (all.length < total) {
+        const term = q.trim();
+        const res = await fetch(
+          `/api/suno-search?type=${type}&q=${encodeURIComponent(term)}&index=${idx}`,
+          { headers: { "X-Admin-Key": ADMIN_KEY } },
+        );
+        if (!res.ok) break;
+        const data = await res.json();
+        const results = data.results ?? [];
+        if (!results.length) break;
+        all = [...all, ...results];
+        idx += 20;
+      }
+      setTracks(all);
+    }
+    setLoadingMore(false);
+    all.filter(t => !isAdded(t.id)).forEach(t => onAddTrack(t));
   }
 
   const showTracks = tracks.length > 0 && (type === "song" || type === "tag" || userHandle);
@@ -315,15 +344,29 @@ function SunoSearch({
               )}
             </p>
             {showTracks && tracks.filter(t => !isAdded(t.id)).length > 0 && (
-              <button
-                onClick={() => tracks.filter(t => !isAdded(t.id)).forEach(t => onAddTrack(t))}
-                style={{
-                  padding: "0.2rem 0.6rem", border: `1px solid ${GREEN}`, borderRadius: "0.4rem",
-                  background: "transparent", color: GREEN, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer",
-                }}
-              >
-                + All {tracks.filter(t => !isAdded(t.id)).length}
-              </button>
+              <div style={{ display: "flex", gap: "0.4rem" }}>
+                <button
+                  onClick={() => tracks.filter(t => !isAdded(t.id)).forEach(t => onAddTrack(t))}
+                  style={{
+                    padding: "0.2rem 0.6rem", border: `1px solid ${GREEN}`, borderRadius: "0.4rem",
+                    background: "transparent", color: GREEN, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer",
+                  }}
+                >
+                  + All {tracks.filter(t => !isAdded(t.id)).length}
+                </button>
+                {tracks.length < total && (
+                  <button
+                    onClick={loadAllAndAdd}
+                    disabled={loadingMore}
+                    style={{
+                      padding: "0.2rem 0.6rem", border: `1px solid ${GREEN}`, borderRadius: "0.4rem",
+                      background: GREEN, color: BG, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer",
+                    }}
+                  >
+                    {loadingMore ? "…" : `+ All ${total}`}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
