@@ -815,7 +815,7 @@ function PlaylistMiniPlayer({
             {name}
           </p>
           <div className="player-card__cover">
-            <img src={displayCover} alt={curr.title} />
+            <img src={croppedCover || displayCover} alt={curr.title} />
           </div>
           <p className="player-card__song">
             {curr.title}
@@ -1273,7 +1273,7 @@ export default function Home() {
                     </svg>
                   </button>
                   <div className="player-card__cover">
-                    <img src={curr.imageUrl} alt={curr.title} />
+                    <img src={currCover || curr.imageUrl} alt={curr.title} />
                   </div>
                   <p className="player-card__song">
                     {curr.title}
