@@ -401,17 +401,19 @@ body {
 .player-card__close:active { box-shadow: none; transform: rotate(90deg) translateY(3px); }
 
 .player-card__cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 11rem;
-  height: 11rem;
   border-radius: 1rem;
   border: 2px solid var(--ink);
   background: var(--cream-deep);
-  font-size: 4.5rem;
   overflow: hidden;
   box-shadow: 3px 3px 0 0 var(--ink);
+  flex-shrink: 0;
+}
+.player-card__cover img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .player-card__song {
@@ -554,7 +556,7 @@ body {
 }
 .player__scrubber-fill {
   height: 100%;
-  background: var(--red);
+  background: var(--ink);
   border-radius: 999px 0 0 999px;
   transition: width 0.25s linear;
   pointer-events: none;
@@ -997,20 +999,15 @@ body {
   flex-shrink: 0;
   width: min(calc(100% - 4rem), 22rem);
   margin: 0 auto;
-  aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 1.25rem;
   border: 2px solid var(--ink);
   box-shadow: 5px 5px 0 0 var(--ink);
-  position: relative;
 }
 
 .player-fs__img {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
   display: block;
 }
 

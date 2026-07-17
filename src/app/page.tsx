@@ -791,11 +791,9 @@ function PlaylistMiniPlayer({
           <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.7rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.4, alignSelf: "flex-start" }}>
             {name}
           </p>
-          <img
-            src={croppedCover || displayCover}
-            alt={curr.title}
-            className="player-card__cover object-contain"
-          />
+          <div className="player-card__cover">
+            <img src={displayCover} alt={curr.title} />
+          </div>
           <p className="player-card__song">
             {curr.title}
             {playing && <span className="now-shelf__dot ml-2 inline-block" />}
@@ -1240,7 +1238,9 @@ export default function Home() {
                       <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
                     </svg>
                   </button>
-                  <img src={currCover || curr.imageUrl} alt={curr.title} className="player-card__cover object-contain" />
+                  <div className="player-card__cover">
+                    <img src={curr.imageUrl} alt={curr.title} />
+                  </div>
                   <p className="player-card__song">
                     {curr.title}
                     {playing && <span className="now-shelf__dot ml-2 inline-block" />}
