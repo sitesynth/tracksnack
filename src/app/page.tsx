@@ -826,7 +826,9 @@ function PlaylistMiniPlayer({
             className="player__scrubber"
             onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
           >
-            <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+            <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
+              <div className="player__scrubber-thumb" />
+            </div>
           </div>
           {nextTrack && (
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
@@ -943,6 +945,7 @@ export default function Home() {
   }, [tracks]);
 
   const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
     const a = audioRef.current;
@@ -952,6 +955,7 @@ export default function Home() {
     const onTime = () => {
       if (isNaN(a.duration)) return;
       setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
+      setElapsed(fmt(a.currentTime));
       setProgress(a.duration > 0 ? a.currentTime / a.duration : 0);
     };
     a.addEventListener("timeupdate", onTime);
@@ -1122,7 +1126,13 @@ export default function Home() {
               <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
             </div>
             <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
-              <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+              <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
+                <div className="player__scrubber-thumb" />
+              </div>
+            </div>
+            <div className="player__scrubber-time">
+              <span>{elapsed || "0:00"}</span>
+              <span>{remaining || curr.duration}</span>
             </div>
             <div className="player__modes">
               {(["seq", "loop", "random"] as const).map(m => (
@@ -1283,7 +1293,13 @@ export default function Home() {
                     </button>
                   </div>
                   <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
-                    <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+                    <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
+                      <div className="player__scrubber-thumb" />
+                    </div>
+                  </div>
+                  <div className="player__scrubber-time">
+                    <span>{elapsed || "0:00"}</span>
+                    <span>{remaining || curr.duration}</span>
                   </div>
                   <div className="player__modes">
                     {(["seq", "loop", "random"] as const).map(m => (
