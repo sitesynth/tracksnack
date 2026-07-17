@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   title: "TrackSnack — AI Music on Demand | Custom Songs in Minutes",
   description:
     "Order a custom AI song about anything — any topic, any genre, cooked live in minutes. Interactive music radio where the audience writes the menu.",
-  icons: { icon: "/tracksnack.png" },
+  icons: { icon: "/favicon.svg" },
   openGraph: {
     title: "TrackSnack — AI Music on Demand | Custom Songs in Minutes",
     description:
