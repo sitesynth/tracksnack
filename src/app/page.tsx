@@ -350,32 +350,6 @@ export default function Home() {
     }).catch(() => {});
   }
 
-  const fadeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  function fadeIn(a: HTMLAudioElement, ms = 500) {
-    if (fadeTimer.current) clearInterval(fadeTimer.current);
-    a.volume = 0;
-    const step = 1 / (ms / 16);
-    fadeTimer.current = setInterval(() => {
-      a.volume = Math.min(1, a.volume + step);
-      if (a.volume >= 1 && fadeTimer.current) clearInterval(fadeTimer.current);
-    }, 16);
-  }
-
-  function fadeOut(a: HTMLAudioElement, ms = 350, onDone?: () => void) {
-    if (fadeTimer.current) clearInterval(fadeTimer.current);
-    const step = a.volume / (ms / 16);
-    fadeTimer.current = setInterval(() => {
-      a.volume = Math.max(0, a.volume - step);
-      if (a.volume <= 0 && fadeTimer.current) {
-        clearInterval(fadeTimer.current);
-        a.pause();
-        a.volume = 1;
-        onDone?.();
-      }
-    }, 16);
-  }
-
   const touchX = useRef(0);
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX;
@@ -394,14 +368,12 @@ export default function Home() {
     if (!a) return;
     if (playing) {
       setPlaying(false);
-      fadeOut(a, 350);
+      a.pause();
     } else {
-      // Pause any active mini-player before starting main
       if (activeAudioRef.current && !activeAudioRef.current.paused) {
         activeAudioRef.current.pause();
       }
       a.play().catch(() => {});
-      fadeIn(a, 500);
       setPlaying(true);
     }
   }
