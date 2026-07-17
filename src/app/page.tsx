@@ -445,11 +445,7 @@ function FreshTrackCard({ track, onBeforePlay }: { track: Track; onBeforePlay: (
             </button>
           </div>
           <div className="player-fs__artwork">
-            {meta?.video_url ? (
-              <video src={meta.video_url} className="player-fs__img" autoPlay loop muted playsInline />
-            ) : (
-              <img src={croppedCover || track.imageUrl} alt={track.title} className="player-fs__img" />
-            )}
+            <img src={croppedCover || track.imageUrl} alt={track.title} className="player-fs__img" />
           </div>
           <div className="player-fs__body">
             <p className="player-fs__song">{track.title}{playing && <span className="now-shelf__dot ml-2 inline-block" />}</p>
@@ -740,11 +736,7 @@ function PlaylistMiniPlayer({
             </button>
           </div>
           <div className="player-fs__artwork">
-            {currMeta?.video_url ? (
-              <video src={currMeta.video_url} className="player-fs__img" autoPlay loop muted playsInline />
-            ) : (
-              displayCover && <img src={croppedCover || displayCover} alt={curr.title} className="player-fs__img" />
-            )}
+            {displayCover && <img src={croppedCover || displayCover} alt={curr.title} className="player-fs__img" />}
           </div>
           <div className="player-fs__body">
             <p className="player-fs__song">
@@ -802,7 +794,7 @@ function PlaylistMiniPlayer({
           <img
             src={croppedCover || displayCover}
             alt={curr.title}
-            className="player-card__cover object-cover"
+            className="player-card__cover object-contain"
           />
           <p className="player-card__song">
             {curr.title}
@@ -1103,11 +1095,7 @@ export default function Home() {
             </button>
           </div>
           <div className="player-fs__artwork">
-            {currMeta?.video_url ? (
-              <video src={currMeta.video_url} className="player-fs__img" autoPlay loop muted playsInline />
-            ) : (
-              <img src={currCover || curr.imageUrl} alt={curr.title} className="player-fs__img" />
-            )}
+            <img src={currCover || curr.imageUrl} alt={curr.title} className="player-fs__img" />
           </div>
           <div className="player-fs__body">
             <p className="player-fs__song">
@@ -1252,7 +1240,7 @@ export default function Home() {
                       <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
                     </svg>
                   </button>
-                  <img src={currCover || curr.imageUrl} alt={curr.title} className="player-card__cover object-cover" />
+                  <img src={currCover || curr.imageUrl} alt={curr.title} className="player-card__cover object-contain" />
                   <p className="player-card__song">
                     {curr.title}
                     {playing && <span className="now-shelf__dot ml-2 inline-block" />}
