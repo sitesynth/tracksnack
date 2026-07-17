@@ -100,6 +100,7 @@ function PlaylistMiniPlayer({
   const [loading, setLoading] = useState(true);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [expanded, setExpanded] = useState(false);
   const shouldPlayRef = useRef(false);
   const tracksLenRef = useRef(0);
 
@@ -161,6 +162,23 @@ function PlaylistMiniPlayer({
     if (shouldPlayRef.current) a.play().catch(() => {});
   }, [idx, tracks]);
 
+  useEffect(() => {
+    if (!playing || !("mediaSession" in navigator)) return;
+    const track = tracks[idx];
+    if (!track) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: displayName || name,
+      artwork: track.image_url ? [{ src: track.image_url, sizes: "512x512" }] : [],
+    });
+    navigator.mediaSession.playbackState = "playing";
+  }, [playing, idx, tracks, displayName, name]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || playing) return;
+    navigator.mediaSession.playbackState = "paused";
+  }, [playing]);
+
   function toggle() {
     const a = audioRef.current;
     if (!a || !tracks.length) return;
@@ -183,58 +201,113 @@ function PlaylistMiniPlayer({
 
   const n = tracks.length;
   const curr = tracks[idx];
+  const nextTrack = n > 1 ? tracks[(idx + 1) % n] : undefined;
   const displayCover = curr?.image_url || coverUrl || "";
 
   return (
-    <div className="playlist-mini">
-      <audio ref={audioRef} preload="none" />
-      <div className="playlist-mini__top">
-        {displayCover
-          ? <img src={displayCover} alt={name} className="playlist-mini__thumb" />
-          : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
-        }
-        <div className="playlist-mini__info">
-          <p className="playlist-mini__title">{displayName || name}</p>
-          {description && <p className="playlist-mini__desc">{description}</p>}
-          <p className="playlist-mini__track">
-            {loading ? "…" : curr?.title || "—"}
-            {playing && <span className="now-shelf__dot ml-2 inline-block" />}
-          </p>
+    <>
+      {/* Full-screen expanded overlay — shown on all screen sizes for mini-players */}
+      {expanded && curr && (
+        <div className="player-fs" style={{ display: "flex" }}>
+          <button
+            className="player-fs__close"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse player"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <div className="player-fs__artwork">
+            {displayCover && <img src={displayCover} alt={curr.title} className="player-fs__img" />}
+          </div>
+          <div className="player-fs__body">
+            <p className="player-fs__song">
+              {curr.title}
+              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+            </p>
+            <p className="player-fs__author" style={{ color: "var(--ink)", textDecoration: "none", opacity: 0.55 }}>
+              {displayName || name}
+            </p>
+            <div className="player__controls" style={{ justifyContent: "center" }}>
+              <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
+              <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
+              <button onClick={() => skip(1)} className="player__nav" disabled={n < 2} aria-label="Next">›</button>
+              <button
+                className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+                onClick={() => toggleLike(curr.id)}
+                aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+              >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
+            </div>
+            {nextTrack && (
+              <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
+                <span className="player-card__next-label menu-type">next up</span>
+                {nextTrack.image_url && <img src={nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
+                <span className="player-card__next-title"><span className="player__song-text">{nextTrack.title}</span></span>
+                <span className="font-black opacity-40">›</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="playlist-mini">
+        <audio ref={audioRef} preload="none" />
+        <div className="playlist-mini__top">
+          <button
+            className="playlist-mini__expand"
+            onClick={() => setExpanded(true)}
+            aria-label="Expand player"
+          >
+            {displayCover
+              ? <img src={displayCover} alt={name} className="playlist-mini__thumb" />
+              : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
+            }
+          </button>
+          <div className="playlist-mini__info">
+            <p className="playlist-mini__title">{displayName || name}</p>
+            {description && <p className="playlist-mini__desc">{description}</p>}
+            <p className="playlist-mini__track">
+              {loading ? "…" : curr?.title || "—"}
+              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+            </p>
+          </div>
+        </div>
+        <div className="playlist-mini__controls">
+          <button
+            className="player__nav"
+            onClick={() => skip(-1)}
+            disabled={n < 2}
+            aria-label="Previous"
+          >‹</button>
+          <button
+            className="player__play"
+            onClick={toggle}
+            disabled={n === 0 || loading}
+            aria-label={playing ? "Pause" : "Play"}
+          >{playing ? "❚❚" : "▶"}</button>
+          <button
+            className="player__nav"
+            onClick={() => skip(1)}
+            disabled={n < 2}
+            aria-label="Next"
+          >›</button>
+          {!loading && n > 0 && (
+            <span className="playlist-mini__count">{idx + 1}/{n}</span>
+          )}
+          {curr && (
+            <button
+              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+              onClick={() => toggleLike(curr.id)}
+              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+            >
+              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+            </button>
+          )}
         </div>
       </div>
-      <div className="playlist-mini__controls">
-        <button
-          className="player__nav"
-          onClick={() => skip(-1)}
-          disabled={n < 2}
-          aria-label="Previous"
-        >‹</button>
-        <button
-          className="player__play"
-          onClick={toggle}
-          disabled={n === 0 || loading}
-          aria-label={playing ? "Pause" : "Play"}
-        >{playing ? "❚❚" : "▶"}</button>
-        <button
-          className="player__nav"
-          onClick={() => skip(1)}
-          disabled={n < 2}
-          aria-label="Next"
-        >›</button>
-        {!loading && n > 0 && (
-          <span className="playlist-mini__count">{idx + 1}/{n}</span>
-        )}
-        {curr && (
-          <button
-            className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-            onClick={() => toggleLike(curr.id)}
-            aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-          >
-            {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
-          </button>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -445,7 +518,7 @@ export default function Home() {
               {AUTHOR} ↗
             </a>
             <div className="player-card__meta">
-              <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
+              {curr.genre && <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>}
               <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
             </div>
             <div className="player__controls" style={{ justifyContent: "center" }}>
@@ -578,7 +651,7 @@ export default function Home() {
                     {AUTHOR} ↗
                   </a>
                   <div className="player-card__meta">
-                    <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
+                    {curr.genre && <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>}
                     <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
                   </div>
                   <div className="player__controls justify-center">

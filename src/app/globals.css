@@ -629,6 +629,19 @@ body {
   background: var(--cream-deep);
 }
 
+.playlist-mini__expand {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 0.75rem;
+}
+
 .playlist-mini__info {
   flex: 1;
   min-width: 0;
