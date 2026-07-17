@@ -40,6 +40,11 @@ const PLAYLIST_ACCENTS: Record<string, string> = {
   mustard: "var(--mustard)",
 };
 
+function fmtDuration(s: number | undefined): string {
+  if (!s || isNaN(s)) return "0:00";
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+}
+
 function mapTracks(raw: RawTrack[]): Track[] {
   return raw.map(t => ({
     id: t.id,
@@ -513,8 +518,13 @@ function PlaylistMiniPlayer({
   const [expanded, setExpanded] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState("");
+  const [remaining, setRemaining] = useState("");
+  const [playMode, setPlayMode] = useState<"seq" | "loop" | "random">("seq");
   const shouldPlayRef = useRef(false);
   const tracksLenRef = useRef(0);
+  const playModeRef = useRef(playMode);
+  useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
   useEffect(() => {
     fetch(`/api/custom-playlists/${playlistId}/tracks`)
@@ -555,8 +565,17 @@ function PlaylistMiniPlayer({
     if (!a) return;
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
-    const onEnded = () =>
-      setIdx(i => (i + 1) % Math.max(1, tracksLenRef.current));
+    const onEnded = () => {
+      const len = Math.max(1, tracksLenRef.current);
+      if (playModeRef.current === "loop") {
+        a.currentTime = 0;
+        a.play().catch(() => {});
+      } else if (playModeRef.current === "random") {
+        setIdx(i => (len < 2 ? i : (i + 1 + Math.floor(Math.random() * (len - 1))) % len));
+      } else {
+        setIdx(i => (i + 1) % len);
+      }
+    };
     a.addEventListener("play", onPlay);
     a.addEventListener("pause", onPause);
     a.addEventListener("ended", onEnded);
@@ -619,9 +638,13 @@ function PlaylistMiniPlayer({
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
+    const fmt = (s: number) =>
+      `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
     const onTime = () => {
-      if (!isNaN(a.duration) && a.duration > 0)
-        setProgress(a.currentTime / a.duration);
+      if (isNaN(a.duration) || a.duration <= 0) return;
+      setProgress(a.currentTime / a.duration);
+      setElapsed(fmt(a.currentTime));
+      setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("loadedmetadata", onTime);
@@ -819,6 +842,17 @@ function PlaylistMiniPlayer({
             <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
               <div className="player__scrubber-thumb" />
             </div>
+          </div>
+          <div className="player__scrubber-time">
+            <span>{elapsed || "0:00"}</span>
+            <span>{remaining || fmtDuration(curr.duration)}</span>
+          </div>
+          <div className="player__modes">
+            {(["seq", "loop", "random"] as const).map(m => (
+              <button key={m} onClick={() => setPlayMode(m)} className={`player__mode${playMode === m ? " active" : ""}`} title={m === "seq" ? "Play all" : m === "loop" ? "Loop track" : "Shuffle"}>
+                {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
+              </button>
+            ))}
           </div>
           {nextTrack && (
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
@@ -1248,7 +1282,6 @@ export default function Home() {
                   <div className="player-card__meta">
                     {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
                     {currMeta && <ArtistChip meta={currMeta} />}
-                    <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
                   </div>
                   <div className="player__controls justify-center">
                     <button
