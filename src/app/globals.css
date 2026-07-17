@@ -722,3 +722,89 @@ body {
 @media (max-width: 767px) {
   .shine-wrap::after { display: none; }
 }
+
+/* ── Full-screen mobile player (expanded) ─────── */
+.player-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 768px) {
+  .player-fs { display: none; }
+}
+
+.player-fs__close {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  right: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--cream-deep);
+  box-shadow: 0 3px 0 0 var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.1s;
+}
+.player-fs__close:hover { transform: rotate(90deg); }
+.player-fs__close:active { box-shadow: none; transform: rotate(90deg) translateY(3px); }
+
+.player-fs__artwork {
+  width: 100%;
+  flex-shrink: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  height: 55vw;
+  min-height: 220px;
+  max-height: 55vh;
+  overflow: hidden;
+}
+
+.player-fs__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-fs__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1.25rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  flex: 1;
+}
+
+.player-fs__song {
+  font-family: var(--font-menu), Impact, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  text-align: center;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.player-fs__author {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.player-fs__author:hover { color: var(--red-deep); }

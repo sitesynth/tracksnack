@@ -415,6 +415,55 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
+      {/* ── Mobile full-screen player (position:fixed at root to escape overflow:hidden) ── */}
+      {expanded && (
+        <div className="player-fs" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <button
+            className="player-fs__close"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse player"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <div className="player-fs__artwork">
+            <img src={curr.imageUrl} alt={curr.title} className="player-fs__img" />
+          </div>
+          <div className="player-fs__body">
+            <p className="player-fs__song">
+              {curr.title}
+              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+            </p>
+            <a
+              href={curr.sunoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="player-fs__author"
+            >
+              {AUTHOR} ↗
+            </a>
+            <div className="player-card__meta">
+              <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
+              <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
+            </div>
+            <div className="player__controls" style={{ justifyContent: "center" }}>
+              <button onClick={() => setTrackIdx((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prev.title}`}>‹</button>
+              <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="player__play">{playing ? "❚❚" : "▶"}</button>
+              <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${next.title}`}>›</button>
+              <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
+            </div>
+            <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
+              <span className="player-card__next-label menu-type">next up</span>
+              <img src={next.imageUrl} alt={next.title} className="player-card__next-img" />
+              <span className="player-card__next-title"><span className="player__song-text">{next.title}</span></span>
+              <span className="font-black opacity-40">›</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ─────────────────────────────── */}
       <header
         className="rounded-xl relative flex items-center justify-between px-4 md:px-6 py-1.5 md:py-2"
@@ -505,73 +554,73 @@ export default function Home() {
               </div>
             ) : (
               <div className="player-card mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                <button
-                  className="player-card__close"
-                  onClick={() => setExpanded(false)}
-                  aria-label="Collapse player"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  </svg>
-                </button>
-                <img src={curr.imageUrl} alt={curr.title} className="player-card__cover object-cover" />
-                <p className="player-card__song">
-                  {curr.title}
-                  {playing && <span className="now-shelf__dot ml-2 inline-block" />}
-                </p>
-                <a
-                  href={curr.sunoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="player-card__author"
-                >
-                  {AUTHOR} ↗
-                </a>
-                <div className="player-card__meta">
-                  <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
-                  <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
-                </div>
-                <div className="player__controls justify-center">
                   <button
-                    onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
-                    className="player__nav"
-                    aria-label={`Previous: ${prev.title}`}
+                    className="player-card__close"
+                    onClick={() => setExpanded(false)}
+                    aria-label="Collapse player"
                   >
-                    ‹
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                      <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                    </svg>
                   </button>
-                  <button
-                    onClick={toggle}
-                    aria-label={playing ? "Pause" : "Play"}
-                    className="player__play"
+                  <img src={curr.imageUrl} alt={curr.title} className="player-card__cover object-cover" />
+                  <p className="player-card__song">
+                    {curr.title}
+                    {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+                  </p>
+                  <a
+                    href={curr.sunoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="player-card__author"
                   >
-                    {playing ? "❚❚" : "▶"}
-                  </button>
+                    {AUTHOR} ↗
+                  </a>
+                  <div className="player-card__meta">
+                    <span className="chip" style={{ background: "var(--yellow)" }}>{curr.genre}</span>
+                    <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
+                  </div>
+                  <div className="player__controls justify-center">
+                    <button
+                      onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
+                      className="player__nav"
+                      aria-label={`Previous: ${prev.title}`}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={toggle}
+                      aria-label={playing ? "Pause" : "Play"}
+                      className="player__play"
+                    >
+                      {playing ? "❚❚" : "▶"}
+                    </button>
+                    <button
+                      onClick={() => setTrackIdx((trackIdx + 1) % n)}
+                      className="player__nav"
+                      aria-label={`Next: ${next.title}`}
+                    >
+                      ›
+                    </button>
+                    <button
+                      onClick={() => toggleLike(trackIdx)}
+                      className={`player__like${liked[trackIdx] ? " is-liked" : ""}`}
+                      aria-label={liked[trackIdx] ? "Unlike" : "Like"}
+                    >
+                      {liked[trackIdx] ? "♥" : "♡"} {likeCount}
+                    </button>
+                  </div>
                   <button
+                    className="player-card__next"
                     onClick={() => setTrackIdx((trackIdx + 1) % n)}
-                    className="player__nav"
-                    aria-label={`Next: ${next.title}`}
                   >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => toggleLike(trackIdx)}
-                    className={`player__like${liked[trackIdx] ? " is-liked" : ""}`}
-                    aria-label={liked[trackIdx] ? "Unlike" : "Like"}
-                  >
-                    {liked[trackIdx] ? "♥" : "♡"} {likeCount}
+                    <span className="player-card__next-label menu-type">next up</span>
+                    <img src={next.imageUrl} alt={next.title} className="player-card__next-img" />
+                    <span className="player-card__next-title"><span ref={nextTitleRef} className="player__song-text">{next.title}</span></span>
+                    <span className="font-black opacity-40">›</span>
                   </button>
                 </div>
-                <button
-                  className="player-card__next"
-                  onClick={() => setTrackIdx((trackIdx + 1) % n)}
-                >
-                  <span className="player-card__next-label menu-type">next up</span>
-                  <img src={next.imageUrl} alt={next.title} className="player-card__next-img" />
-                  <span className="player-card__next-title"><span ref={nextTitleRef} className="player__song-text">{next.title}</span></span>
-                  <span className="font-black opacity-40">›</span>
-                </button>
-              </div>
             )}
 
             <p className="menu-type text-xl md:text-2xl mb-2" style={{ color: "var(--brown)" }}>
