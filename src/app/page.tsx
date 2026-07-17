@@ -458,8 +458,7 @@ function FreshTrackCard({ track, onBeforePlay }: { track: Track; onBeforePlay: (
               <div className="player-card__meta">
                 {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
                 {meta && <ArtistChip meta={meta} />}
-                <span className="chip" style={{ background: "var(--mint)" }}>⏱ {track.duration}</span>
-              </div>
+                </div>
             )}
             <div className="player__controls" style={{ justifyContent: "center" }}>
               <button onClick={toggle} className="player__play" aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
@@ -1137,7 +1136,6 @@ export default function Home() {
             <div className="player-card__meta">
               {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
               {currMeta && <ArtistChip meta={currMeta} />}
-              <span className="chip" style={{ background: "var(--mint)" }}>⏱ {remaining || curr.duration}</span>
             </div>
             <div className="player__controls" style={{ justifyContent: "center" }}>
               <button onClick={() => setTrackIdx((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prev.title}`}>‹</button>

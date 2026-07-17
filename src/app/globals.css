@@ -552,7 +552,7 @@ body {
   margin: 0.875rem 0 0.5rem;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .player__scrubber-fill {
   height: 100%;
@@ -564,23 +564,26 @@ body {
 }
 .player__scrubber-thumb {
   position: absolute;
-  top: 1px;
-  right: -1px;
-  width: 10px;
-  height: calc(100% - 2px);
-  border-radius: 0 3px 3px 0;
-  background: var(--ink);
+  top: 50%;
+  right: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 2px solid var(--ink);
+  box-shadow: 1px 1px 0 0 var(--ink);
+  transform: translateY(-50%);
 }
 .player__scrubber-time {
   display: flex;
   justify-content: space-between;
   width: 100%;
   font-family: var(--font-menu), Impact, sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   letter-spacing: 0.05em;
   font-weight: 800;
-  opacity: 0.45;
-  margin-top: -0.2rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
   margin-bottom: 0.1rem;
 }
 
