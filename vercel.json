@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/trusted-authors/sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

@@ -681,6 +681,48 @@ export default function Admin() {
   const [newSourceId, setNewSourceId] = useState("");
   const [sourceMsg, setSourceMsg] = useState("");
 
+  type TrustedAuthor = { handle: string; addedAt: string; lastChecked: string | null; tracksAdded: number };
+  const [trustedAuthors, setTrustedAuthors] = useState<TrustedAuthor[]>([]);
+  const [newAuthorHandle, setNewAuthorHandle] = useState("");
+  const [authorMsg, setAuthorMsg] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
+  const loadTrustedAuthors = useCallback(async () => {
+    const res = await fetch("/api/trusted-authors");
+    if (res.ok) setTrustedAuthors(await res.json());
+  }, []);
+
+  async function addTrustedAuthor() {
+    const handle = newAuthorHandle.trim().replace(/^@/, "");
+    if (!handle) return;
+    const res = await fetch("/api/trusted-authors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+      body: JSON.stringify({ handle }),
+    });
+    if (res.ok) { setAuthorMsg(`Added @${handle}`); setNewAuthorHandle(""); await loadTrustedAuthors(); }
+    else setAuthorMsg("Error adding author");
+    setTimeout(() => setAuthorMsg(""), 3000);
+  }
+
+  async function removeTrustedAuthor(handle: string) {
+    await fetch(`/api/trusted-authors?handle=${encodeURIComponent(handle)}`, {
+      method: "DELETE", headers: { "X-Admin-Key": ADMIN_KEY },
+    });
+    await loadTrustedAuthors();
+  }
+
+  async function syncNow() {
+    setSyncing(true);
+    const res = await fetch("/api/trusted-authors/sync", { headers: { "X-Admin-Key": ADMIN_KEY } });
+    const data = await res.json();
+    setSyncing(false);
+    setAuthorMsg(data.added ? `Added ${data.added} new track(s)` : "No new tracks");
+    setTimeout(() => setAuthorMsg(""), 4000);
+    await loadTrustedAuthors();
+    await loadQueue();
+  }
+
   const [selectedSource, setSelectedSource] = useState("");
   const [sourceTracks, setSourceTracks] = useState<Track[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(false);
@@ -852,7 +894,8 @@ export default function Admin() {
     loadCustoms();
     loadOrders();
     loadSnapshots();
-  }, [loadSources, loadQueue, loadCustoms, loadOrders, loadSnapshots]);
+    loadTrustedAuthors();
+  }, [loadSources, loadQueue, loadCustoms, loadOrders, loadSnapshots, loadTrustedAuthors]);
 
   async function loadSourceTracks(playlistId: string) {
     if (!playlistId) { setSourceTracks([]); return; }
@@ -1496,6 +1539,62 @@ export default function Admin() {
               </div>
             ))}
             {sources.length === 0 && <p style={{ opacity: 0.35, fontSize: "0.875rem" }}>No sources yet.</p>}
+          </div>
+
+          {/* Trusted Authors */}
+          <div style={{ marginTop: "2.5rem", maxWidth: 560 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.75rem" }}>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: "0.9rem" }}>Trusted Authors</p>
+              <button
+                onClick={syncNow}
+                disabled={syncing}
+                style={{ padding: "0.25rem 0.75rem", borderRadius: "0.5rem", border: `1px solid ${GREEN}`, background: "transparent", color: GREEN, fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}
+              >
+                {syncing ? "Syncing…" : "Sync now"}
+              </button>
+            </div>
+            <p style={{ margin: "0 0 1rem", opacity: 0.4, fontSize: "0.78rem" }}>
+              New public tracks from these authors are automatically added to the Main Mix every 15 min.
+            </p>
+            <div style={{ display: "flex", gap: "0.625rem", marginBottom: "1rem" }}>
+              <input
+                value={newAuthorHandle}
+                onChange={e => setNewAuthorHandle(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addTrustedAuthor()}
+                placeholder="@suno_handle"
+                style={{
+                  flex: 1, padding: "0.5rem 0.75rem",
+                  border: `2px solid ${TEXT}`, borderRadius: "0.625rem",
+                  background: "transparent", color: TEXT, fontSize: "0.875rem",
+                }}
+              />
+              <button
+                onClick={addTrustedAuthor}
+                style={{ padding: "0.5rem 1rem", border: `2px solid ${YELLOW}`, borderRadius: "0.625rem", background: YELLOW, color: BG, fontWeight: 800, cursor: "pointer", fontSize: "0.875rem" }}
+              >
+                Add
+              </button>
+            </div>
+            {authorMsg && <p style={{ marginBottom: "0.75rem", color: GREEN, fontWeight: 700, fontSize: "0.82rem" }}>{authorMsg}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {trustedAuthors.map(a => (
+                <div key={a.handle} style={{ border: `1px solid ${BORDER}`, borderRadius: "0.75rem", background: CARD, padding: "0.625rem 1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 800, margin: "0 0 0.15rem", fontSize: "0.875rem" }}>@{a.handle}</p>
+                    <p style={{ fontSize: "0.68rem", opacity: 0.4, margin: 0 }}>
+                      {a.tracksAdded ? `${a.tracksAdded} tracks added` : "no tracks yet"}
+                      {a.lastChecked ? ` · checked ${new Date(a.lastChecked).toLocaleTimeString()}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeTrustedAuthor(a.handle)}
+                    aria-label="Remove"
+                    style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${BORDER}`, background: "transparent", color: PINK, cursor: "pointer", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  >✕</button>
+                </div>
+              ))}
+              {trustedAuthors.length === 0 && <p style={{ opacity: 0.35, fontSize: "0.875rem" }}>No trusted authors yet.</p>}
+            </div>
           </div>
         </div>
       )}
