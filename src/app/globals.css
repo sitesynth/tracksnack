@@ -511,6 +511,27 @@ body {
   color: var(--ink);
 }
 
+.player__scrubber {
+  width: 100%;
+  height: 6px;
+  background: rgba(0,0,0,0.12);
+  border-radius: 3px;
+  margin: 0.75rem 0 0.5rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.player__scrubber-fill {
+  height: 100%;
+  background: var(--ink);
+  border-radius: 3px;
+  transition: width 0.25s linear;
+  pointer-events: none;
+}
+.player__scrubber:hover .player__scrubber-fill {
+  background: var(--mint);
+}
+
 .now-shelf__dot {
   width: 7px;
   height: 7px;

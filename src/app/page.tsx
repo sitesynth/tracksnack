@@ -451,11 +451,6 @@ function FreshTrackCard({ track, onBeforePlay }: { track: Track; onBeforePlay: (
           </div>
           <div className="player-fs__body">
             <p className="player-fs__song">{track.title}{playing && <span className="now-shelf__dot ml-2 inline-block" />}</p>
-            {meta?.artist && (
-              <a href={meta.handle ? `https://suno.com/@${meta.handle}` : track.sunoUrl} target="_blank" rel="noopener noreferrer" className="player-fs__author">
-                {meta.artist} ↗
-              </a>
-            )}
             {(genre || meta) && (
               <div className="player-card__meta">
                 {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
@@ -865,6 +860,8 @@ export default function Home() {
     };
   }, [tracks]);
 
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
@@ -873,6 +870,7 @@ export default function Home() {
     const onTime = () => {
       if (isNaN(a.duration)) return;
       setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
+      setProgress(a.duration > 0 ? a.currentTime / a.duration : 0);
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("loadedmetadata", onTime);
@@ -881,6 +879,12 @@ export default function Home() {
       a.removeEventListener("loadedmetadata", onTime);
     };
   }, []);
+
+  function seekTo(pct: number) {
+    const a = audioRef.current;
+    if (!a || isNaN(a.duration)) return;
+    a.currentTime = pct * a.duration;
+  }
 
   useEffect(() => {
     for (const el of [songTitleRef.current, nextTitleRef.current]) {
@@ -1002,14 +1006,6 @@ export default function Home() {
               {curr.title}
               {playing && <span className="now-shelf__dot ml-2 inline-block" />}
             </p>
-            <a
-              href={curr.sunoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="player-fs__author"
-            >
-              {AUTHOR} ↗
-            </a>
             <div className="player-card__meta">
               {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
               {currMeta && <ArtistChip meta={currMeta} />}
@@ -1020,6 +1016,9 @@ export default function Home() {
               <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="player__play">{playing ? "❚❚" : "▶"}</button>
               <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${next.title}`}>›</button>
               <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
+            </div>
+            <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
+              <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
             </div>
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
@@ -1137,14 +1136,6 @@ export default function Home() {
                     {curr.title}
                     {playing && <span className="now-shelf__dot ml-2 inline-block" />}
                   </p>
-                  <a
-                    href={currMeta?.handle ? `https://suno.com/@${currMeta.handle}` : curr.sunoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="player-card__author"
-                  >
-                    {currMeta?.artist || AUTHOR} ↗
-                  </a>
                   <div className="player-card__meta">
                     {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
                     {currMeta && <ArtistChip meta={currMeta} />}
@@ -1179,6 +1170,9 @@ export default function Home() {
                     >
                       {liked[trackIdx] ? "♥" : "♡"} {likeCount}
                     </button>
+                  </div>
+                  <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
+                    <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
                   </div>
                   <button
                     className="player-card__next"
