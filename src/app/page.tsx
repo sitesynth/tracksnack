@@ -295,10 +295,37 @@ export default function Home() {
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !tracks.length) return;
-    a.src = tracks[trackIdx]?.audioUrl ?? "";
+    const track = tracks[trackIdx];
+    a.src = track?.audioUrl ?? "";
     setRemaining("");
     if (playing) a.play().catch(() => {});
+    if ("mediaSession" in navigator && track) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: AUTHOR,
+        artwork: track.imageUrl ? [{ src: track.imageUrl, sizes: "512x512" }] : [],
+      });
+    }
   }, [trackIdx, tracks]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+  }, [playing]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !tracks.length) return;
+    const n = tracks.length;
+    navigator.mediaSession.setActionHandler("play", () => { audioRef.current?.play().catch(() => {}); setPlaying(true); });
+    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current?.pause(); setPlaying(false); });
+    navigator.mediaSession.setActionHandler("previoustrack", () => setTrackIdx(i => (i - 1 + n) % n));
+    navigator.mediaSession.setActionHandler("nexttrack", () => setTrackIdx(i => (i + 1) % n));
+    return () => {
+      (["play","pause","previoustrack","nexttrack"] as MediaSessionAction[]).forEach(a => {
+        navigator.mediaSession.setActionHandler(a, null);
+      });
+    };
+  }, [tracks]);
 
   useEffect(() => {
     const a = audioRef.current;
