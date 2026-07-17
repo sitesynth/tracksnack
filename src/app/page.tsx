@@ -1222,6 +1222,7 @@ export default function Home() {
                     <span className="player-card__next-title"><span ref={nextTitleRef} className="player__song-text">{next.title}</span></span>
                     <span className="font-black opacity-40">›</span>
                   </button>
+                  <TrackComments trackId={curr.id} />
                 </div>
             )}
 

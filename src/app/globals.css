@@ -372,7 +372,7 @@ body {
   background: var(--paper);
   box-shadow: 5px 5px 0 0 var(--ink);
   width: 100%;
-  max-width: 26rem;
+  max-width: 30rem;
   animation: fadeUp 0.25s ease-out both;
   touch-action: pan-y;
 }
