@@ -515,6 +515,8 @@ function PlaylistMiniPlayer({
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [progress, setProgress] = useState(0);
   const shouldPlayRef = useRef(false);
   const tracksLenRef = useRef(0);
 
@@ -610,6 +612,35 @@ function PlaylistMiniPlayer({
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onTime = () => {
+      if (!isNaN(a.duration) && a.duration > 0)
+        setProgress(a.currentTime / a.duration);
+    };
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onTime);
+    return () => {
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onTime);
+    };
+  }, []);
+
+  function seekTo(pct: number) {
+    const a = audioRef.current;
+    if (!a || isNaN(a.duration)) return;
+    a.currentTime = pct * a.duration;
+  }
+
   function toggle() {
     const a = audioRef.current;
     if (!a || !tracks.length) return;
@@ -639,9 +670,61 @@ function PlaylistMiniPlayer({
   const currMeta = useTrackMeta(curr?.id);
   const genre = currMeta ? genreLabel(currMeta.tags) : "";
 
+  const miniCard = (
+    <div className="playlist-mini">
+      <div
+        className="playlist-mini__band"
+        style={{ background: PLAYLIST_ACCENTS[accent ?? ""] || "var(--cream-deep)" }}
+      >
+        <span className="playlist-mini__band-name">{name}</span>
+        <span className="playlist-mini__band-count">{loading ? "…" : `${n} tracks`}</span>
+      </div>
+      <div className="playlist-mini__body">
+        {description && <p className="playlist-mini__desc">{description}</p>}
+        <div className="playlist-mini__top">
+          {displayCover
+            ? (
+              <button className="playlist-mini__expand" onClick={() => setExpanded(true)} aria-label="Expand player">
+                <img src={croppedCover || displayCover} alt={name} className="playlist-mini__thumb" />
+              </button>
+            )
+            : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
+          }
+          <div className="playlist-mini__info">
+            <p className="playlist-mini__label">Now serving</p>
+            <p className="playlist-mini__track">
+              {loading ? "…" : curr?.title || "—"}
+              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+            </p>
+          </div>
+        </div>
+        <div className="playlist-mini__controls">
+          <button className="player__nav" onClick={() => skip(-1)} disabled={n < 2} aria-label="Previous">‹</button>
+          <button className="player__play" onClick={toggle} disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
+          <button className="player__nav" onClick={() => skip(1)} disabled={n < 2} aria-label="Next">›</button>
+          {!loading && n > 0 && (
+            <span className="playlist-mini__count">{idx + 1}/{n}</span>
+          )}
+          {curr && (
+            <button
+              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+              onClick={() => toggleLike(curr.id)}
+              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+            >
+              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      {expanded && curr && (
+      <audio ref={audioRef} preload="none" />
+
+      {/* Mobile fullscreen player */}
+      {expanded && !isDesktop && curr && (
         <div className="player-fs" style={{ display: "flex" }}>
           <div className="player-fs__topbar">
             <span className="player-fs__playlist-name">{name}</span>
@@ -700,68 +783,64 @@ function PlaylistMiniPlayer({
         </div>
       )}
 
-      <div className="playlist-mini">
-      <audio ref={audioRef} preload="none" />
-      <div
-        className="playlist-mini__band"
-        style={{ background: PLAYLIST_ACCENTS[accent ?? ""] || "var(--cream-deep)" }}
-      >
-        <span className="playlist-mini__band-name">{name}</span>
-        <span className="playlist-mini__band-count">{loading ? "…" : `${n} tracks`}</span>
-      </div>
-      <div className="playlist-mini__body">
-        {description && <p className="playlist-mini__desc">{description}</p>}
-        <div className="playlist-mini__top">
-          {displayCover
-            ? (
-              <button className="playlist-mini__expand" onClick={() => setExpanded(true)} aria-label="Expand player">
-                <img src={croppedCover || displayCover} alt={name} className="playlist-mini__thumb" />
-              </button>
-            )
-            : <div className="playlist-mini__thumb playlist-mini__thumb--empty" aria-hidden />
-          }
-          <div className="playlist-mini__info">
-            <p className="playlist-mini__label">Now serving</p>
-            <p className="playlist-mini__track">
-              {loading ? "…" : curr?.title || "—"}
-              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
-            </p>
+      {/* Desktop: expanded = player-card inline; collapsed = mini card */}
+      {expanded && isDesktop && curr ? (
+        <div className="player-card" style={{ maxWidth: "30rem", margin: "0 auto" }}>
+          <button
+            className="player-card__close"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse player"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+              <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.7rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.4, alignSelf: "flex-start" }}>
+            {name}
+          </p>
+          <img
+            src={croppedCover || displayCover}
+            alt={curr.title}
+            className="player-card__cover object-cover"
+          />
+          <p className="player-card__song">
+            {curr.title}
+            {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+          </p>
+          <div className="player-card__meta">
+            {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
+            {currMeta && <ArtistChip meta={currMeta} />}
           </div>
-        </div>
-        <div className="playlist-mini__controls">
-          <button
-            className="player__nav"
-            onClick={() => skip(-1)}
-            disabled={n < 2}
-            aria-label="Previous"
-          >‹</button>
-          <button
-            className="player__play"
-            onClick={toggle}
-            disabled={n === 0 || loading}
-            aria-label={playing ? "Pause" : "Play"}
-          >{playing ? "❚❚" : "▶"}</button>
-          <button
-            className="player__nav"
-            onClick={() => skip(1)}
-            disabled={n < 2}
-            aria-label="Next"
-          >›</button>
-          {!loading && n > 0 && (
-            <span className="playlist-mini__count">{idx + 1}/{n}</span>
-          )}
-          {curr && (
+          <div className="player__controls" style={{ justifyContent: "center" }}>
+            <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
+            <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
+            <button onClick={() => skip(1)} className="player__nav" disabled={n < 2} aria-label="Next">›</button>
             <button
-              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+              className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
               onClick={() => toggleLike(curr.id)}
               aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-            >
-              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+            >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
+          </div>
+          <div
+            className="player__scrubber"
+            onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
+          >
+            <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+          </div>
+          {nextTrack && (
+            <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
+              <span className="player-card__next-label menu-type">next up</span>
+              {nextTrack.image_url && <img src={croppedNext || nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
+              <span className="player-card__next-title"><span className="player__song-text">{nextTrack.title}</span></span>
+              <span className="font-black opacity-40">›</span>
             </button>
           )}
+          <TrackComments trackId={curr.id} />
         </div>
-      </div>
-      </div>
+      ) : (
+        miniCard
+      )}
     </>
   );
 }
