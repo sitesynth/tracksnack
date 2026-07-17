@@ -511,6 +511,34 @@ body {
   color: var(--ink);
 }
 
+.player__modes {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.player__mode {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+}
+.player__mode.active {
+  opacity: 1;
+  background: var(--ink);
+  color: var(--paper);
+}
+.player__mode:hover { opacity: 0.7; }
+
 .player__scrubber {
   width: 100%;
   height: 6px;

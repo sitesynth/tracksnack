@@ -259,7 +259,9 @@ function useTrackMeta(id?: string): TrackMeta | null {
 
 /* Tags can be a long style prompt — take the first segment, word-trimmed. */
 function genreLabel(tags: string): string {
-  const first = (tags || "").split(/[,.\n]/)[0].trim().replace(/^an?\s+/i, "");
+  const skip = /^\d+\s*bpm$|^[a-z]m$|^\d+$/i;
+  const parts = (tags || "").split(/[,.\n]/).map(s => s.trim().replace(/^an?\s+/i, "")).filter(s => s && !skip.test(s));
+  const first = parts[0] ?? "";
   if (!first) return "";
   return first.length > 32 ? first.slice(0, 32).replace(/\s+\S*$/, "") + "…" : first;
 }
@@ -772,6 +774,7 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [trackIdx, setTrackIdx] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [playMode, setPlayMode] = useState<"seq" | "loop" | "random">("seq");
   const [tracks, setTracks] = useState<Track[]>([]);
   const [liked, setLiked] = useState<boolean[]>([]);
   const [remaining, setRemaining] = useState<string>("");
@@ -885,6 +888,28 @@ export default function Home() {
     if (!a || isNaN(a.duration)) return;
     a.currentTime = pct * a.duration;
   }
+
+  const playModeRef = useRef(playMode);
+  useEffect(() => { playModeRef.current = playMode; }, [playMode]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onEnded = () => {
+      const n = tracks.length || 1;
+      const mode = playModeRef.current;
+      if (mode === "loop") {
+        a.currentTime = 0;
+        a.play().catch(() => {});
+      } else if (mode === "random") {
+        setTrackIdx(Math.floor(Math.random() * n));
+      } else {
+        setTrackIdx(i => (i + 1) % n);
+      }
+    };
+    a.addEventListener("ended", onEnded);
+    return () => a.removeEventListener("ended", onEnded);
+  }, [tracks]);
 
   useEffect(() => {
     for (const el of [songTitleRef.current, nextTitleRef.current]) {
@@ -1019,6 +1044,13 @@ export default function Home() {
             </div>
             <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
               <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+            <div className="player__modes">
+              {(["seq", "loop", "random"] as const).map(m => (
+                <button key={m} onClick={() => setPlayMode(m)} className={`player__mode${playMode === m ? " active" : ""}`} title={m === "seq" ? "Play all" : m === "loop" ? "Loop track" : "Shuffle"}>
+                  {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
+                </button>
+              ))}
             </div>
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
@@ -1173,6 +1205,13 @@ export default function Home() {
                   </div>
                   <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
                     <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }} />
+                  </div>
+                  <div className="player__modes">
+                    {(["seq", "loop", "random"] as const).map(m => (
+                      <button key={m} onClick={() => setPlayMode(m)} className={`player__mode${playMode === m ? " active" : ""}`} title={m === "seq" ? "Play all" : m === "loop" ? "Loop track" : "Shuffle"}>
+                        {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
+                      </button>
+                    ))}
                   </div>
                   <button
                     className="player-card__next"
