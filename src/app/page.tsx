@@ -45,6 +45,38 @@ function fmtDuration(s: number | undefined): string {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+function Scrubber({ progress, seekTo }: { progress: number; seekTo: (pct: number) => void }) {
+  const dragging = useRef(false);
+  const pct = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  return (
+    <div
+      className="player__scrubber"
+      onPointerDown={e => {
+        dragging.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        seekTo(pct(e));
+      }}
+      onPointerMove={e => { if (dragging.current) seekTo(pct(e)); }}
+      onPointerUp={e => {
+        dragging.current = false;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      onPointerCancel={() => { dragging.current = false; }}
+      /* keep the parent card's swipe-to-change-track gesture out of the scrubber */
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
+    >
+      <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
+        <div className="player__scrubber-thumb" />
+      </div>
+    </div>
+  );
+}
+
 function mapTracks(raw: RawTrack[]): Track[] {
   return raw.map(t => ({
     id: t.id,
@@ -838,14 +870,7 @@ function PlaylistMiniPlayer({
               aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
             >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
           </div>
-          <div
-            className="player__scrubber"
-            onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
-          >
-            <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
-              <div className="player__scrubber-thumb" />
-            </div>
-          </div>
+          <Scrubber progress={progress} seekTo={seekTo} />
           <div className="player__scrubber-time">
             <span>{elapsed || "0:00"}</span>
             <span>{remaining || fmtDuration(curr.duration)}</span>
@@ -1153,11 +1178,7 @@ export default function Home() {
               <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${next.title}`}>›</button>
               <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
             </div>
-            <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
-              <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
-                <div className="player__scrubber-thumb" />
-              </div>
-            </div>
+            <Scrubber progress={progress} seekTo={seekTo} />
             <div className="player__scrubber-time">
               <span>{elapsed || "0:00"}</span>
               <span>{remaining || curr.duration}</span>
@@ -1324,11 +1345,7 @@ export default function Home() {
                       {liked[trackIdx] ? "♥" : "♡"} {likeCount}
                     </button>
                   </div>
-                  <div className="player__scrubber" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}>
-                    <div className="player__scrubber-fill" style={{ width: `${progress * 100}%` }}>
-                      <div className="player__scrubber-thumb" />
-                    </div>
-                  </div>
+                  <Scrubber progress={progress} seekTo={seekTo} />
                   <div className="player__scrubber-time">
                     <span>{elapsed || "0:00"}</span>
                     <span>{remaining || curr.duration}</span>

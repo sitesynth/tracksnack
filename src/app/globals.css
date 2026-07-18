@@ -582,6 +582,7 @@ body {
   cursor: pointer;
   position: relative;
   overflow: visible;
+  touch-action: none;
 }
 .player__scrubber-fill {
   height: 100%;
