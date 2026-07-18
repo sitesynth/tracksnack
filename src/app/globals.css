@@ -560,7 +560,7 @@ body {
 
 .player__scrubber {
   width: 100%;
-  height: 14px;
+  height: 10px;
   background: var(--cream);
   border: 2px solid var(--ink);
   border-radius: 999px;
@@ -574,18 +574,18 @@ body {
   height: 100%;
   background: var(--ink);
   border-radius: 999px 0 0 999px;
-  transition: width 0.25s linear;
+  transition: width 0.15s linear;
   pointer-events: none;
   position: relative;
 }
 .player__scrubber-thumb {
   position: absolute;
   top: 50%;
-  right: -7px;
-  width: 14px;
-  height: 14px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--cream);
+  background: var(--yellow);
   border: 2px solid var(--ink);
   box-shadow: 1px 1px 0 0 var(--ink);
   transform: translateY(-50%);

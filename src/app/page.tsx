@@ -945,6 +945,8 @@ export default function Home() {
     const track = tracks[trackIdx];
     a.src = track?.audioUrl ?? "";
     setRemaining("");
+    setProgress(0);
+    setElapsed("");
     if (playing) a.play().catch(() => {});
     if ("mediaSession" in navigator && track) {
       navigator.mediaSession.metadata = new MediaMetadata({
