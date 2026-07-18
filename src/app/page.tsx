@@ -1219,7 +1219,7 @@ export default function Home() {
           <a href="#how" className="hover:text-red">How it works</a>
           <a href="#chef" className="hover:text-red">The chef</a>
         </nav>
-        <a href="#order" className="pill pill-red pill-sm text-sm py-2 px-4">Order a track</a>
+        <a href="#order-track" className="pill pill-red pill-sm text-sm py-2 px-4">Order a track</a>
       </header>
 
       {/* ── Hero: roadside billboard at dusk ───── */}
@@ -1382,7 +1382,7 @@ export default function Home() {
               Suno oven and serve it live on air, still sizzling.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <a href="#order" className="pill pill-yellow text-base">Order a track</a>
+              <a href="#order-track" className="pill pill-yellow text-base">Order a track</a>
               <a href="#tips" className="pill pill-paper text-base">Tips</a>
             </div>
           </div>

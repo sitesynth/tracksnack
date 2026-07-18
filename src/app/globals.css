@@ -39,6 +39,7 @@
 * { box-sizing: border-box; }
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 1.5rem;
   /* iOS WebKit ignores overflow-x:hidden for touch panning — the page can
      still be dragged sideways to off-screen content. clip removes the
      horizontal scroll container entirely (iOS 16+); hidden is the fallback. */
