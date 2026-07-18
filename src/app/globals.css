@@ -240,6 +240,7 @@ body {
 .player {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.65rem 0.75rem;
   border: 2px solid var(--ink);
@@ -252,6 +253,18 @@ body {
   /* horizontal swipe is handled in JS — stop the browser's own horizontal
      gesture recognizer (edge-swipe-back on Safari/Chrome) from firing too */
   touch-action: pan-y;
+}
+/* Mobile: controls drop to their own centered row so the title gets full width */
+@media (max-width: 767px) {
+  .player__controls {
+    width: 100%;
+    justify-content: center;
+    border-top: 1.5px solid rgba(22, 18, 16, 0.12);
+    padding-top: 0.55rem;
+  }
+}
+@media (min-width: 768px) {
+  .player { flex-wrap: nowrap; }
 }
 
 .player__cover {
