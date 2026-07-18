@@ -1516,7 +1516,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col min-[480px]:flex-row items-center justify-center gap-3">
             <a
-              href="https://web.tribute.tg/p/PRODUCT_ID"
+              href="https://web.tribute.tg/d/Nkg"
               target="_blank"
               rel="noopener noreferrer"
               className="pill pill-red text-base"
@@ -1524,7 +1524,7 @@ export default function Home() {
               Leave a tip
             </a>
             <a
-              href="https://telegram.me/tribute/app?startapp=pPRODUCT_ID"
+              href="https://t.me/tribute/app?startapp=dNkg"
               target="_blank"
               rel="noopener noreferrer"
               className="pill text-base"
