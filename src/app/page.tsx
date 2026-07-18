@@ -651,7 +651,7 @@ function PlaylistMiniPlayer({
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("loadedmetadata", onTime);
     };
-  }, []);
+  }, [tracks.length > 0]);
 
   function seekTo(pct: number) {
     const a = audioRef.current;
@@ -996,7 +996,7 @@ export default function Home() {
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("loadedmetadata", onTime);
     };
-  }, []);
+  }, [tracks.length > 0]);
 
   function seekTo(pct: number) {
     const a = audioRef.current;
