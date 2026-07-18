@@ -1379,12 +1379,11 @@ export default function Home() {
                 </div>
             ))}
 
-            <p className="menu-type text-xl md:text-2xl mb-2" style={{ color: "var(--brown)" }}>
-              The roadside music diner
-            </p>
+            <h1 className="display text-2xl md:text-3xl mb-2" style={{ color: "var(--brown)" }}>
+              Fresh Songs, Cooked Live.
+            </h1>
             <p className="font-semibold text-sm md:text-base max-w-md mx-auto mb-7 opacity-80">
-              You order a track in chat — topic plus genre. We cook it in the
-              Suno oven and serve it live on air, still sizzling.
+              Order a song. Watch us cook it. Hear it live.
             </p>
             <div className="flex items-center justify-center gap-3">
               <a href="#order-track" className="pill pill-yellow text-base">Order a track</a>
