@@ -1102,12 +1102,14 @@ export default function Home() {
     }).catch(() => {});
   }
 
-  const touchX = useRef(0);
+  const touchX = useRef<number | null>(null);
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX;
   }, []);
   const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchX.current;
+    touchX.current = null;
     if (Math.abs(dx) < 40) return;
     setTrackIdx(i => {
       const len = tracks.length || 1;
