@@ -917,6 +917,7 @@ export default function Home() {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [freshTracks, setFreshTracks] = useState<Track[]>([]);
+  const [tipOpen, setTipOpen] = useState(false);
 
   // Pause any active mini-player before the main player starts
   function handleBeforePlay(newAudio: HTMLAudioElement) {
@@ -1515,14 +1516,13 @@ export default function Home() {
             drop something in the jar — every bit keeps the oven hot.
           </p>
           <div className="flex flex-col min-[480px]:flex-row items-center justify-center gap-3">
-            <a
-              href="https://web.tribute.tg/d/Nkg"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setTipOpen(true)}
               className="pill pill-red text-base"
+              style={{ cursor: "pointer" }}
             >
-              Leave a tip
-            </a>
+              Tip with card
+            </button>
             <a
               href="https://t.me/tribute/app?startapp=dNkg"
               target="_blank"
@@ -1533,6 +1533,19 @@ export default function Home() {
               Tip via Telegram
             </a>
           </div>
+          {tipOpen && (
+            <div className="tip-modal" onClick={() => setTipOpen(false)}>
+              <div className="tip-modal__box" onClick={e => e.stopPropagation()}>
+                <button className="tip-modal__close" onClick={() => setTipOpen(false)} aria-label="Close">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                    <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+                <iframe src="https://web.tribute.tg/d/Nkg" className="tip-modal__frame" title="Tip the chef" />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
