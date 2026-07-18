@@ -1137,19 +1137,22 @@ export default function Home() {
   const currMeta = useTrackMeta(tracks[trackIdx]?.id);
   const nextMeta = useTrackMeta(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.id : undefined);
 
-  if (!tracks.length) return null;
-
   const n = tracks.length;
-  const prev = tracks[(trackIdx - 1 + n) % n];
-  const curr = tracks[trackIdx];
-  const next = tracks[(trackIdx + 1) % n];
-  const likeCount = likeCounts[curr.id] ?? curr.likes;
-  const genre = (currMeta && genreLabel(currMeta.tags)) || curr.genre;
+  const prev = n > 0 ? tracks[(trackIdx - 1 + n) % n] : null;
+  const curr = n > 0 ? tracks[trackIdx] : null;
+  const next = n > 0 ? tracks[(trackIdx + 1) % n] : null;
+  const likeCount = curr ? (likeCounts[curr.id] ?? curr.likes) : 0;
+  const genre = curr ? ((currMeta && genreLabel(currMeta.tags)) || curr.genre) : "";
+
+  // Narrowed aliases — only non-null when tracks are loaded (curr guards all player JSX)
+  const currT = curr!;
+  const prevT = prev!;
+  const nextT = next!;
 
   return (
     <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
       {/* ── Mobile full-screen player (position:fixed at root to escape overflow:hidden) ── */}
-      {expanded && (
+      {expanded && curr && (
         <div className="player-fs" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="player-fs__topbar">
             <button
@@ -1176,9 +1179,9 @@ export default function Home() {
               {currMeta && <ArtistChip meta={currMeta} />}
             </div>
             <div className="player__controls" style={{ justifyContent: "center" }}>
-              <button onClick={() => setTrackIdx((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prev.title}`}>‹</button>
+              <button onClick={() => setTrackIdx((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prevT.title}`}>‹</button>
               <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="player__play">{playing ? "❚❚" : "▶"}</button>
-              <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${next.title}`}>›</button>
+              <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${nextT.title}`}>›</button>
               <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
             </div>
             <Scrubber progress={progress} seekTo={seekTo} />
@@ -1195,9 +1198,9 @@ export default function Home() {
             </div>
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
-              <img src={nextCover || next.imageUrl} alt={next.title} className="player-card__next-img" />
+              <img src={nextCover || nextT.imageUrl} alt={nextT.title} className="player-card__next-img" />
               <span className="player-card__next-title">
-                <span className="player__song-text">{next.title}</span>
+                <span className="player__song-text">{nextT.title}</span>
                 <span className="player-card__next-author">{nextMeta?.artist || AUTHOR}</span>
               </span>
               <span className="font-black opacity-40">›</span>
@@ -1255,7 +1258,7 @@ export default function Home() {
             </div>
 
             {/* Player */}
-            {!expanded ? (
+            {curr && (!expanded ? (
               <div className="player mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 <button
                   className="player__cover overflow-hidden"
@@ -1275,7 +1278,7 @@ export default function Home() {
                   <button
                     onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
                     className="player__nav"
-                    aria-label={`Previous: ${prev.title}`}
+                    aria-label={`Previous: ${prevT.title}`}
                   >
                     ‹
                   </button>
@@ -1289,7 +1292,7 @@ export default function Home() {
                   <button
                     onClick={() => setTrackIdx((trackIdx + 1) % n)}
                     className="player__nav"
-                    aria-label={`Next: ${next.title}`}
+                    aria-label={`Next: ${nextT.title}`}
                   >
                     ›
                   </button>
@@ -1322,7 +1325,7 @@ export default function Home() {
                     <button
                       onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
                       className="player__nav"
-                      aria-label={`Previous: ${prev.title}`}
+                      aria-label={`Previous: ${prevT.title}`}
                     >
                       ‹
                     </button>
@@ -1336,7 +1339,7 @@ export default function Home() {
                     <button
                       onClick={() => setTrackIdx((trackIdx + 1) % n)}
                       className="player__nav"
-                      aria-label={`Next: ${next.title}`}
+                      aria-label={`Next: ${nextT.title}`}
                     >
                       ›
                     </button>
@@ -1365,16 +1368,16 @@ export default function Home() {
                     onClick={() => setTrackIdx((trackIdx + 1) % n)}
                   >
                     <span className="player-card__next-label menu-type">next up</span>
-                    <img src={nextCover || next.imageUrl} alt={next.title} className="player-card__next-img" />
+                    <img src={nextCover || nextT.imageUrl} alt={nextT.title} className="player-card__next-img" />
                     <span className="player-card__next-title">
-                      <span ref={nextTitleRef} className="player__song-text">{next.title}</span>
+                      <span ref={nextTitleRef} className="player__song-text">{nextT.title}</span>
                       <span className="player-card__next-author">{nextMeta?.artist || AUTHOR}</span>
                     </span>
                     <span className="font-black opacity-40">›</span>
                   </button>
                   <TrackComments trackId={curr.id} />
                 </div>
-            )}
+            ))}
 
             <p className="menu-type text-xl md:text-2xl mb-2" style={{ color: "var(--brown)" }}>
               The roadside music diner
