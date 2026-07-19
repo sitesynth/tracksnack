@@ -45,6 +45,30 @@ function fmtDuration(s: number | undefined): string {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+/* ── Broadcast grid ───────────────────────────────
+   The station clock: everyone computes the same "what's on air right now"
+   from wall time, so a reload (or a new visitor) drops into the middle of
+   the schedule instead of restarting from track 1. */
+const BROADCAST_EPOCH = Date.UTC(2026, 0, 1);
+
+function parseDur(d: string | undefined): number {
+  if (!d) return 0;
+  const [m, s] = d.split(":").map(Number);
+  return (m || 0) * 60 + (s || 0);
+}
+
+function broadcastPosition(tracks: Track[]): { idx: number; offset: number } {
+  const durs = tracks.map(t => parseDur(t.duration) || 180);
+  const total = durs.reduce((a, b) => a + b, 0);
+  let t = ((Date.now() - BROADCAST_EPOCH) / 1000) % total;
+  let idx = 0;
+  while (t >= durs[idx]) {
+    t -= durs[idx];
+    idx = (idx + 1) % durs.length;
+  }
+  return { idx, offset: t };
+}
+
 function Scrubber({ progress, seekTo }: { progress: number; seekTo: (pct: number) => void }) {
   const dragging = useRef(false);
   const pct = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1025,6 +1049,29 @@ export default function Home() {
   const [freshTracks, setFreshTracks] = useState<Track[]>([]);
   const [tipOpen, setTipOpen] = useState(false);
 
+  /* Broadcast grid state: liveSync = following the station clock. Any manual
+     navigation (prev/next, swipe, next-up, scrubber) leaves the live grid and
+     turns the player into a free playlist until reload. */
+  const liveSyncRef = useRef(true);
+  const pendingSeekRef = useRef<number | null>(null);
+
+  const selectTrack = (i: number | ((i: number) => number)) => {
+    liveSyncRef.current = false;
+    setTrackIdx(i);
+  };
+
+  function applySeek(a: HTMLAudioElement, offset: number) {
+    if (a.readyState >= 1) {
+      a.currentTime = offset;
+    } else {
+      const onMeta = () => {
+        a.currentTime = Math.min(offset, Math.max(0, (a.duration || offset + 1) - 1));
+        a.removeEventListener("loadedmetadata", onMeta);
+      };
+      a.addEventListener("loadedmetadata", onMeta);
+    }
+  }
+
   // Pause any active mini-player before the main player starts
   function handleBeforePlay(newAudio: HTMLAudioElement) {
     const mainAudio = audioRef.current;
@@ -1041,18 +1088,24 @@ export default function Home() {
 
   useEffect(() => {
     async function loadTracks() {
+      const applyList = (list: Track[]) => {
+        setTracks(list);
+        setLiked(list.map(() => false));
+        if (list.length > 1) {
+          const pos = broadcastPosition(list);
+          pendingSeekRef.current = pos.offset;
+          setTrackIdx(pos.idx);
+        }
+      };
       try {
         const qData = await fetch("/api/queue").then(r => r.json());
         if (Array.isArray(qData) && qData.length > 0) {
-          const mapped = mapTracks(qData);
-          setTracks(mapped);
-          setLiked(mapped.map(() => false));
+          applyList(mapTracks(qData));
           return;
         }
       } catch {}
       const data: Track[] = await fetch("/tracks.json").then(r => r.json()).catch(() => []);
-      setTracks(data);
-      setLiked(data.map(() => false));
+      applyList(data);
     }
     loadTracks();
     fetch("/api/likes")
@@ -1079,6 +1132,11 @@ export default function Home() {
     setRemaining("");
     setProgress(0);
     setElapsed("");
+    const seek = pendingSeekRef.current;
+    if (seek !== null) {
+      pendingSeekRef.current = null;
+      if (seek > 2) applySeek(a, seek);
+    }
     if (playing) a.play().catch(() => {});
     if ("mediaSession" in navigator && track) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -1099,8 +1157,8 @@ export default function Home() {
     const n = tracks.length;
     navigator.mediaSession.setActionHandler("play", () => { audioRef.current?.play().catch(() => {}); setPlaying(true); });
     navigator.mediaSession.setActionHandler("pause", () => { audioRef.current?.pause(); setPlaying(false); });
-    navigator.mediaSession.setActionHandler("previoustrack", () => setTrackIdx(i => (i - 1 + n) % n));
-    navigator.mediaSession.setActionHandler("nexttrack", () => setTrackIdx(i => (i + 1) % n));
+    navigator.mediaSession.setActionHandler("previoustrack", () => selectTrack(i => (i - 1 + n) % n));
+    navigator.mediaSession.setActionHandler("nexttrack", () => selectTrack(i => (i + 1) % n));
     return () => {
       (["play","pause","previoustrack","nexttrack"] as MediaSessionAction[]).forEach(a => {
         navigator.mediaSession.setActionHandler(a, null);
@@ -1133,6 +1191,7 @@ export default function Home() {
   function seekTo(pct: number) {
     const a = audioRef.current;
     if (!a || isNaN(a.duration)) return;
+    liveSyncRef.current = false;
     a.currentTime = pct * a.duration;
   }
 
@@ -1217,6 +1276,7 @@ export default function Home() {
     const dx = e.changedTouches[0].clientX - touchX.current;
     touchX.current = null;
     if (Math.abs(dx) < 40) return;
+    liveSyncRef.current = false;
     setTrackIdx(i => {
       const len = tracks.length || 1;
       return dx < 0 ? (i + 1) % len : (i - 1 + len) % len;
@@ -1232,6 +1292,18 @@ export default function Home() {
     } else {
       if (activeAudioRef.current && !activeAudioRef.current.paused) {
         activeAudioRef.current.pause();
+      }
+      // Joining the live grid: re-sync to "what's on air right now" — pausing
+      // the radio means missing a piece, like a real station.
+      if (liveSyncRef.current && playModeRef.current === "seq" && tracks.length > 1) {
+        const pos = broadcastPosition(tracks);
+        if (pos.idx !== trackIdx) {
+          pendingSeekRef.current = pos.offset;
+          setTrackIdx(pos.idx);
+          setPlaying(true);
+          return;
+        }
+        if (pos.offset > 2) applySeek(a, pos.offset);
       }
       a.play().catch(() => {});
       setPlaying(true);
@@ -1285,9 +1357,9 @@ export default function Home() {
               {currMeta && <ArtistChip meta={currMeta} />}
             </div>
             <div className="player__controls" style={{ justifyContent: "center" }}>
-              <button onClick={() => setTrackIdx((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prevT.title}`}>‹</button>
+              <button onClick={() => selectTrack((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prevT.title}`}>‹</button>
               <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="player__play">{playing ? "❚❚" : "▶"}</button>
-              <button onClick={() => setTrackIdx((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${nextT.title}`}>›</button>
+              <button onClick={() => selectTrack((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${nextT.title}`}>›</button>
               <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
             </div>
             <Scrubber progress={progress} seekTo={seekTo} />
@@ -1302,7 +1374,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <button className="player-card__next" style={{ width: "100%" }} onClick={() => setTrackIdx((trackIdx + 1) % n)}>
+            <button className="player-card__next" style={{ width: "100%" }} onClick={() => selectTrack((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
               <img src={nextCover || nextT.imageUrl} alt={nextT.title} className="player-card__next-img" />
               <span className="player-card__next-title">
@@ -1382,7 +1454,7 @@ export default function Home() {
                 </button>
                 <div className="player__controls">
                   <button
-                    onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
+                    onClick={() => selectTrack((trackIdx - 1 + n) % n)}
                     className="player__nav"
                     aria-label={`Previous: ${prevT.title}`}
                   >
@@ -1396,7 +1468,7 @@ export default function Home() {
                     {playing ? "❚❚" : "▶"}
                   </button>
                   <button
-                    onClick={() => setTrackIdx((trackIdx + 1) % n)}
+                    onClick={() => selectTrack((trackIdx + 1) % n)}
                     className="player__nav"
                     aria-label={`Next: ${nextT.title}`}
                   >
@@ -1429,7 +1501,7 @@ export default function Home() {
                   </div>
                   <div className="player__controls justify-center">
                     <button
-                      onClick={() => setTrackIdx((trackIdx - 1 + n) % n)}
+                      onClick={() => selectTrack((trackIdx - 1 + n) % n)}
                       className="player__nav"
                       aria-label={`Previous: ${prevT.title}`}
                     >
@@ -1443,7 +1515,7 @@ export default function Home() {
                       {playing ? "❚❚" : "▶"}
                     </button>
                     <button
-                      onClick={() => setTrackIdx((trackIdx + 1) % n)}
+                      onClick={() => selectTrack((trackIdx + 1) % n)}
                       className="player__nav"
                       aria-label={`Next: ${nextT.title}`}
                     >
@@ -1471,7 +1543,7 @@ export default function Home() {
                   </div>
                   <button
                     className="player-card__next"
-                    onClick={() => setTrackIdx((trackIdx + 1) % n)}
+                    onClick={() => selectTrack((trackIdx + 1) % n)}
                   >
                     <span className="player-card__next-label menu-type">next up</span>
                     <img src={nextCover || nextT.imageUrl} alt={nextT.title} className="player-card__next-img" />
