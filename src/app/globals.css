@@ -913,6 +913,99 @@ body {
 }
 
 /* ── Order form inputs ── */
+/* ── Order form menu style ── */
+.order-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+.order-form__label {
+  font-family: var(--font-menu), sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-top: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+.order-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.order-tiles--lang { flex-wrap: nowrap; }
+.order-tile {
+  padding: 0.4rem 0.9rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream);
+  font-family: var(--font-menu), sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 0 var(--ink);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.order-tile:hover { transform: translateY(-1px); box-shadow: 2px 3px 0 0 var(--ink); }
+.order-tile:active { transform: translateY(1px); box-shadow: 1px 1px 0 0 var(--ink); }
+.order-tile.is-selected {
+  background: var(--ink);
+  color: var(--cream);
+  box-shadow: 2px 2px 0 0 var(--red);
+}
+
+/* ── Order theater (status steps) ── */
+.order-theater {
+  border: 2px solid var(--ink);
+  border-radius: 1.25rem;
+  padding: 1.75rem 2rem;
+  background: var(--cream);
+  box-shadow: 4px 4px 0 0 var(--ink);
+  text-align: left;
+}
+.order-theater__num {
+  font-family: var(--font-menu), sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  margin-bottom: 1.25rem;
+}
+.order-theater__steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.order-theater__step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  opacity: 0.2;
+  transition: opacity 0.4s ease;
+}
+.order-theater__step.is-done { opacity: 0.45; }
+.order-theater__step.is-current { opacity: 1; }
+.order-theater__icon {
+  font-size: 1.25rem;
+  width: 2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.order-theater__step.is-current .order-theater__icon {
+  animation: bounce-icon 0.6s ease infinite alternate;
+}
+@keyframes bounce-icon {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-4px); }
+}
+
 .order-input {
   width: 100%;
   padding: 0.75rem 1rem;

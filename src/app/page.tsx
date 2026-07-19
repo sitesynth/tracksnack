@@ -124,24 +124,53 @@ function Road() {
   return <div className="road" aria-hidden />;
 }
 
+const ORDER_GENRES = ["Rock", "Funk", "Jazz", "Disco", "Metal", "Surprise Me"] as const;
+const ORDER_LANGS = ["EN", "ES", "PT", "RU"] as const;
+const ORDER_MOODS = ["Funny", "Romantic", "Weird", "Dark", "Epic"] as const;
+const ORDER_STEPS = [
+  { icon: "🧾", label: "Order received" },
+  { icon: "✍️", label: "Lyrics being chopped" },
+  { icon: "🎸", label: "Style being seasoned" },
+  { icon: "🔥", label: "Cooking" },
+  { icon: "🎧", label: "Ready for tasting" },
+];
+const STEP_DELAYS = [0, 4000, 9000, 15000, 22000];
+
 function OrderForm() {
   const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [style, setStyle] = useState("");
-  const [sent, setSent] = useState(false);
+  const [story, setStory] = useState("");
+  const [genre, setGenre] = useState("");
+  const [lang, setLang] = useState("EN");
+  const [moods, setMoods] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [orderNum, setOrderNum] = useState<number | null>(null);
+  const [step, setStep] = useState(-1);
+
+  const toggleMood = (m: string) =>
+    setMoods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !desc.trim() || sending) return;
+    if (!name.trim() || !story.trim() || sending) return;
     setSending(true);
     try {
-      await fetch("/api/orders", {
+      const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), description: desc.trim(), style: style.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: story.trim(),
+          style: [genre, ...moods].filter(Boolean).join(", "),
+          language: lang,
+        }),
       });
-      setSent(true);
+      const data = await res.json().catch(() => ({}));
+      setOrderNum(data?.id ?? data?.order_id ?? Math.floor(Math.random() * 900 + 100));
+      setStep(0);
+      STEP_DELAYS.forEach((delay, i) => {
+        if (i === 0) return;
+        setTimeout(() => setStep(i), delay);
+      });
     } catch { /* ignore */ }
     setSending(false);
   };
@@ -158,13 +187,21 @@ function OrderForm() {
         <p className="font-semibold opacity-70 max-w-md mx-auto mb-8">
           Tell the chef what you&apos;re craving — describe the vibe, mood, or story and our DJs will cook it up.
         </p>
-        {sent ? (
-          <div className="panel !p-6 text-center">
-            <p className="display text-xl mb-1">Order received!</p>
-            <p className="font-medium opacity-60 text-sm">The kitchen got your ticket. We&apos;ll start cooking soon.</p>
+
+        {step >= 0 ? (
+          <div className="order-theater">
+            <p className="order-theater__num">ORDER #{orderNum}</p>
+            <ul className="order-theater__steps">
+              {ORDER_STEPS.map((s, i) => (
+                <li key={s.label} className={`order-theater__step${i <= step ? " is-done" : ""}${i === step ? " is-current" : ""}`}>
+                  <span className="order-theater__icon">{s.icon}</span>
+                  <span>{s.label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
-          <form onSubmit={submit} className="flex flex-col gap-3 text-left">
+          <form onSubmit={submit} className="order-form">
             <input
               type="text"
               placeholder="Your name"
@@ -173,27 +210,66 @@ function OrderForm() {
               required
               className="order-input"
             />
+
+            <label className="order-form__label">Tell us your story</label>
             <textarea
-              placeholder="Describe the track you want (mood, topic, story…)"
-              value={desc}
-              onChange={e => setDesc(e.target.value)}
+              placeholder="A funk track about losing Wi-Fi during a date. Make it dramatic."
+              value={story}
+              onChange={e => setStory(e.target.value)}
               required
               rows={3}
               className="order-input"
             />
-            <input
-              type="text"
-              placeholder="Style / genre (optional)"
-              value={style}
-              onChange={e => setStyle(e.target.value)}
-              className="order-input"
-            />
+
+            <label className="order-form__label">Pick your flavor</label>
+            <div className="order-tiles">
+              {ORDER_GENRES.map(g => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGenre(prev => prev === g ? "" : g)}
+                  className={`order-tile${genre === g ? " is-selected" : ""}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+
+            <label className="order-form__label">Choose language</label>
+            <div className="order-tiles order-tiles--lang">
+              {ORDER_LANGS.map(l => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLang(l)}
+                  className={`order-tile${lang === l ? " is-selected" : ""}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            <label className="order-form__label">Add some spice</label>
+            <div className="order-tiles">
+              {ORDER_MOODS.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => toggleMood(m)}
+                  className={`order-tile${moods.includes(m) ? " is-selected" : ""}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
             <button
               type="submit"
               disabled={sending}
-              className="pill pill-red text-base mt-2 self-center"
+              className="pill pill-red text-lg mt-4 self-center"
+              style={{ padding: "0.75rem 2rem" }}
             >
-              {sending ? "Sending…" : "Send to the kitchen"}
+              {sending ? "Sending to kitchen…" : "🔥 Send to the kitchen"}
             </button>
           </form>
         )}
