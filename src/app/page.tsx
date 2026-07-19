@@ -125,7 +125,7 @@ function Road() {
 }
 
 const ORDER_GENRES = ["Rock", "Funk", "Jazz", "Disco", "Metal", "Surprise Me"] as const;
-const ORDER_LANGS = ["EN", "ES", "PT", "RU"] as const;
+const ORDER_LANGS = ["EN", "ES", "PT", "RU", "FR", "DE", "IT", "UA"] as const;
 const ORDER_MOODS = ["Funny", "Romantic", "Weird", "Dark", "Epic"] as const;
 const ORDER_STEPS = [
   { icon: "🧾", label: "Order received" },
@@ -134,7 +134,9 @@ const ORDER_STEPS = [
   { icon: "🔥", label: "Cooking" },
   { icon: "🎧", label: "Ready for tasting" },
 ];
-const STEP_DELAYS = [0, 4000, 9000, 15000, 22000];
+/* Auto-advance stops at "Cooking" — the real bake takes 5–7 minutes and the
+   premiere happens on air, so the last step stays honestly pending. */
+const STEP_DELAYS = [0, 4000, 9000, 15000];
 
 function OrderForm() {
   const [name, setName] = useState("");
@@ -165,7 +167,14 @@ function OrderForm() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      setOrderNum(data?.id ?? data?.order_id ?? Math.floor(Math.random() * 900 + 100));
+      const raw = data?.id ?? data?.order_id;
+      // Backend ids are strings — fold into a 3-digit ticket number for the display
+      const num = typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? [...raw].reduce((a, c) => a + c.charCodeAt(0), 0) % 900 + 100
+          : Math.floor(Math.random() * 900 + 100);
+      setOrderNum(num);
       setStep(0);
       STEP_DELAYS.forEach((delay, i) => {
         if (i === 0) return;
@@ -199,6 +208,11 @@ function OrderForm() {
                 </li>
               ))}
             </ul>
+            {step >= STEP_DELAYS.length - 1 && (
+              <p className="order-theater__note">
+                5–7 minutes in the oven. Your track premieres live on air — stay tuned.
+              </p>
+            )}
           </div>
         ) : (
           <form onSubmit={submit} className="order-form">
@@ -236,7 +250,7 @@ function OrderForm() {
             </div>
 
             <label className="order-form__label">Choose language</label>
-            <div className="order-tiles order-tiles--lang">
+            <div className="order-tiles">
               {ORDER_LANGS.map(l => (
                 <button
                   key={l}

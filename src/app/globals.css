@@ -934,7 +934,6 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.order-tiles--lang { flex-wrap: nowrap; }
 .order-tile {
   padding: 0.4rem 0.9rem;
   border: 2px solid var(--ink);
@@ -997,6 +996,14 @@ body {
   width: 2rem;
   text-align: center;
   flex-shrink: 0;
+}
+.order-theater__note {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1.5px solid rgba(22, 18, 16, 0.15);
+  font-weight: 600;
+  font-size: 0.85rem;
+  opacity: 0.6;
 }
 .order-theater__step.is-current .order-theater__icon {
   animation: bounce-icon 0.6s ease infinite alternate;
