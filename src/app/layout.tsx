@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Alfa_Slab_One, Bebas_Neue, Overpass } from "next/font/google";
+import { Alfa_Slab_One, Oswald, Overpass } from "next/font/google";
 import "./globals.css";
 
 const display = Alfa_Slab_One({
@@ -8,9 +8,9 @@ const display = Alfa_Slab_One({
   variable: "--font-display",
 });
 
-const menu = Bebas_Neue({
-  weight: "400",
-  subsets: ["latin"],
+const menu = Oswald({
+  weight: ["400", "700"],
+  subsets: ["latin", "cyrillic"],
   variable: "--font-menu",
 });
 

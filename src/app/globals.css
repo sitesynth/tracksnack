@@ -70,7 +70,8 @@ body {
 
 /* Menu-board type (prices, labels, ticker) */
 .menu-type {
-  font-family: var(--font-menu), Impact, sans-serif;
+  font-family: var(--font-menu), "Arial Narrow", sans-serif;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -320,10 +321,11 @@ body {
 .player__info { flex: 1; min-width: 0; }
 
 .player__song {
-  font-family: var(--font-menu), Impact, sans-serif;
+  font-family: var(--font-menu), "Arial Narrow", sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   line-height: 1.1;
   overflow: hidden;
   white-space: nowrap;
@@ -347,7 +349,7 @@ body {
   opacity: 0.55;
 }
 @media (min-width: 768px) {
-  .player__song { font-size: 1.35rem; }
+  .player__song { font-size: 1.1rem; }
   .player__author { font-size: 0.78rem; }
 }
 
