@@ -1385,10 +1385,14 @@ export default function Home() {
             <p className="font-semibold text-sm md:text-base max-w-md mx-auto mb-7 opacity-80">
               Order a song. Watch us cook it. Hear it live.
             </p>
-            <div className="flex items-center justify-center gap-3">
-              <a href="#order-track" className="pill pill-yellow text-base">Order a track</a>
-              <a href="#tips" className="pill pill-paper text-base">Tips</a>
+            <div className="flex items-center justify-center gap-3 mb-5">
+              <a href="#order-track" className="pill pill-yellow text-base">🌭 Order a song</a>
+              <a href="#" className="pill pill-paper text-base">🎧 Listen live</a>
             </div>
+            <p className="hero__kitchen-status">
+              <span className="hero__kitchen-dot" />
+              Kitchen opens tonight · Meanwhile, listen to today&apos;s fresh tracks
+            </p>
           </div>
           <div className="legs" aria-hidden>
             <span /><span />

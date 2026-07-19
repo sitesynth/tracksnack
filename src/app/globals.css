@@ -183,6 +183,38 @@ body {
 }
 
 /* Neon sign */
+.hero__kitchen-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-menu), sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.hero__kitchen-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.hero__kitchen-status.is-live {
+  opacity: 1;
+  color: var(--mint);
+}
+.hero__kitchen-status.is-live .hero__kitchen-dot {
+  background: var(--mint);
+  box-shadow: 0 0 6px var(--mint);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
 .neon {
   font-family: var(--font-menu), sans-serif;
   letter-spacing: 0.14em;
