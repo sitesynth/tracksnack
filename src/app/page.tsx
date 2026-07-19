@@ -1218,8 +1218,8 @@ export default function Home() {
   }, [tracks]);
 
   useEffect(() => {
-    for (const el of [songTitleRef.current, nextTitleRef.current]) {
-      if (!el) continue;
+    const el = songTitleRef.current;
+    if (el) {
       const overflow = el.scrollWidth - (el.parentElement?.clientWidth ?? 0);
       if (overflow > 4) {
         el.style.setProperty("--sx", `-${overflow}px`);
