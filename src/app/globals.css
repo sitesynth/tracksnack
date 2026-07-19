@@ -970,7 +970,12 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.45;
-  margin-bottom: 1.25rem;
+}
+.order-theater__dish {
+  font-family: var(--font-display), serif;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  margin: 0.35rem 0 1.25rem;
 }
 .order-theater__steps {
   list-style: none;

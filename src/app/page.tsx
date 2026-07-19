@@ -138,6 +138,19 @@ const ORDER_STEPS = [
    premiere happens on air, so the last step stays honestly pending. */
 const STEP_DELAYS = [0, 4000, 9000, 15000];
 
+/* Food × music dish names — every order gets one, seeded by its ticket
+   number so it survives re-renders. Reusable for premiere/share cards. */
+const DISH_SOUND = ["Disco", "Funk", "Jazz", "Metal", "Surf-Rock", "Lo-Fi", "Psychedelic", "Honky-Tonk", "Bossa", "Techno"];
+const DISH_FOOD = ["Gumbo", "Lasagna", "Burrito", "Ramen", "Pierogi", "Meatballs", "Cheesecake", "Shawarma", "Borscht", "Pancakes", "Goulash", "Paella"];
+const DISH_TAIL = ["of Doom", "Deluxe", "Flambé", "à la Chef", "with Extra Sauce", "on the Rocks", "Supreme", ""];
+
+function dishName(seed: number, genre?: string) {
+  const sound = genre && genre !== "Surprise Me" ? genre : DISH_SOUND[seed % DISH_SOUND.length];
+  const food = DISH_FOOD[Math.floor(seed / 7) % DISH_FOOD.length];
+  const tail = DISH_TAIL[Math.floor(seed / 3) % DISH_TAIL.length];
+  return [sound, food, tail].filter(Boolean).join(" ");
+}
+
 function OrderForm() {
   const [name, setName] = useState("");
   const [story, setStory] = useState("");
@@ -200,6 +213,9 @@ function OrderForm() {
         {step >= 0 ? (
           <div className="order-theater">
             <p className="order-theater__num">ORDER #{orderNum}</p>
+            {orderNum !== null && (
+              <p className="order-theater__dish">“{dishName(orderNum, genre)}”</p>
+            )}
             <ul className="order-theater__steps">
               {ORDER_STEPS.map((s, i) => (
                 <li key={s.label} className={`order-theater__step${i <= step ? " is-done" : ""}${i === step ? " is-current" : ""}`}>
@@ -283,7 +299,7 @@ function OrderForm() {
               className="pill pill-red text-lg mt-4 self-center"
               style={{ padding: "0.75rem 2rem" }}
             >
-              {sending ? "Sending to kitchen…" : "🔥 Send to the kitchen"}
+              {sending ? "Sending to kitchen…" : "Send to the kitchen"}
             </button>
           </form>
         )}
@@ -1476,8 +1492,8 @@ export default function Home() {
               Order a song. Watch us cook it. Hear it live.
             </p>
             <div className="flex items-center justify-center gap-3 mb-5">
-              <a href="#order-track" className="pill pill-yellow text-base">🌭 Order a song</a>
-              <a href="#" className="pill pill-paper text-base">🎧 Listen live</a>
+              <a href="#order-track" className="pill pill-yellow text-base">Order a song</a>
+              <a href="#" className="pill pill-paper text-base">Listen live</a>
             </div>
             <p className="hero__kitchen-status">
               <span className="hero__kitchen-dot" />
