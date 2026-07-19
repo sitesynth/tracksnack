@@ -466,6 +466,7 @@ body {
 
 .player-card__song {
   font-family: var(--font-menu), Impact, sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 1.5rem;
@@ -1240,6 +1241,7 @@ body {
 
 .player-fs__song {
   font-family: var(--font-menu), Impact, sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 1.6rem;
