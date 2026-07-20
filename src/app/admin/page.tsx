@@ -671,7 +671,23 @@ function AdminLogin({ onAuth }: { onAuth: () => void }) {
 
 export default function Admin() {
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"mix" | "playlists" | "sources" | "orders" | "fresh">("mix");
+  const [tab, setTab] = useState<"mix" | "playlists" | "sources" | "orders" | "fresh" | "settings">("mix");
+  const [streamUrl, setStreamUrl] = useState("");
+  const [configMsg, setConfigMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/config").then(r => r.json()).then(d => { if (d.stream_url) setStreamUrl(d.stream_url); }).catch(() => {});
+  }, []);
+
+  async function saveConfig() {
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+      body: JSON.stringify({ stream_url: streamUrl.trim() }),
+    });
+    setConfigMsg(res.ok ? "Saved" : "Error");
+    setTimeout(() => setConfigMsg(""), 3000);
+  }
 
   useEffect(() => {
     try { if (localStorage.getItem("ts-admin") === "1") setAuthed(true); } catch {}
@@ -1121,7 +1137,7 @@ export default function Admin() {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: "0.4rem", flexShrink: 0 }}>
-          {(["mix", "playlists", "sources", "orders", "fresh"] as const).map(t => (
+          {(["mix", "playlists", "sources", "orders", "fresh", "settings"] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -1133,7 +1149,7 @@ export default function Admin() {
                 fontWeight: 700, cursor: "pointer", fontSize: "0.75rem",
               }}
             >
-              {t === "mix" ? "Mix" : t === "playlists" ? "Playlists" : t === "sources" ? "Sources" : t === "fresh" ? "Fresh" : `Orders${orders.filter(o => o.status === "new").length ? ` (${orders.filter(o => o.status === "new").length})` : ""}`}
+              {t === "mix" ? "Mix" : t === "playlists" ? "Playlists" : t === "sources" ? "Sources" : t === "fresh" ? "Fresh" : t === "settings" ? "Settings" : `Orders${orders.filter(o => o.status === "new").length ? ` (${orders.filter(o => o.status === "new").length})` : ""}`}
             </button>
           ))}
         </div>
@@ -1792,6 +1808,47 @@ export default function Admin() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "settings" && (
+        <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
+          <h2 style={{ margin: "0 0 1.5rem", fontSize: "1rem", fontWeight: 800 }}>Station settings</h2>
+          <div style={{ maxWidth: 480, display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <label style={{ fontWeight: 700, fontSize: "0.82rem" }}>
+              Live stream URL
+              <span style={{ fontWeight: 400, opacity: 0.5, marginLeft: "0.4rem" }}>(Icecast / HLS / MP3 stream)</span>
+            </label>
+            <input
+              type="url"
+              value={streamUrl}
+              onChange={e => setStreamUrl(e.target.value)}
+              placeholder="https://stream.example.com/live.mp3"
+              style={{
+                padding: "0.55rem 0.85rem", borderRadius: 8,
+                border: `1.5px solid ${BORDER}`, background: BG, color: TEXT,
+                fontSize: "0.9rem", width: "100%",
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <button
+                onClick={saveConfig}
+                style={{
+                  padding: "0.45rem 1.25rem", borderRadius: 8,
+                  border: "none", background: YELLOW, color: BG,
+                  fontWeight: 800, cursor: "pointer", fontSize: "0.85rem",
+                }}
+              >
+                Save
+              </button>
+              {configMsg && <span style={{ fontSize: "0.82rem", color: configMsg === "Saved" ? GREEN : PINK }}>{configMsg}</span>}
+            </div>
+            {streamUrl && (
+              <p style={{ fontSize: "0.75rem", opacity: 0.45, margin: 0 }}>
+                LISTEN LIVE button will point to this URL. Changes take effect on next page load.
+              </p>
+            )}
           </div>
         </div>
       )}

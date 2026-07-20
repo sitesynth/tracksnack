@@ -1169,6 +1169,7 @@ export default function Home() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [freshTracks, setFreshTracks] = useState<Track[]>([]);
   const [tipOpen, setTipOpen] = useState(false);
+  const [streamUrl, setStreamUrl] = useState("");
 
   /* Broadcast grid state: liveSync = following the station clock. Any manual
      navigation (prev/next, swipe, next-up, scrubber) leaves the live grid and
@@ -1242,6 +1243,10 @@ export default function Home() {
       .then(d => {
         if (d.tracks && Array.isArray(d.tracks)) setFreshTracks(mapTracks(d.tracks));
       })
+      .catch(() => {});
+    fetch("/api/config")
+      .then(r => r.json())
+      .then(d => { if (d.stream_url) setStreamUrl(d.stream_url); })
       .catch(() => {});
   }, []);
 
@@ -1686,7 +1691,10 @@ export default function Home() {
             </p>
             <div className="flex items-center justify-center gap-3 mb-5">
               <a href="#order-track" className="pill pill-yellow text-base">Order a song</a>
-              <a href="#" className="pill pill-paper text-base">Listen live</a>
+              {streamUrl
+                ? <a href={streamUrl} target="_blank" rel="noopener noreferrer" className="pill pill-paper text-base">Listen live</a>
+                : <a href="#" className="pill pill-paper text-base" style={{ opacity: 0.4, pointerEvents: "none" }}>Listen live</a>
+              }
             </div>
             <p className="hero__kitchen-status">
               <span className="hero__kitchen-dot" />
