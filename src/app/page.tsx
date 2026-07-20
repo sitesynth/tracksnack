@@ -130,7 +130,7 @@ const STEPS = [
   {
     n: "1",
     title: "Place your order",
-    desc: `Drop a topic + a genre in the chat. “A track about my cat, Rammstein style” — that's a valid order.`,
+    desc: `Drop a topic + a genre in the chat. "A track about my cat, Rammstein style" — that's a valid order.`,
   },
   {
     n: "2",
@@ -175,6 +175,65 @@ function dishName(seed: number, genre?: string) {
   return [sound, food, tail].filter(Boolean).join(" ");
 }
 
+function shareOrder(orderNum: number, genre: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 720;
+  canvas.height = 1280;
+  const ctx = canvas.getContext("2d")!;
+
+  // Background
+  ctx.fillStyle = "#F6EEDD";
+  ctx.fillRect(0, 0, 720, 1280);
+
+  // Red stripe top
+  ctx.fillStyle = "#D6231F";
+  ctx.fillRect(0, 0, 720, 18);
+
+  // Red stripe bottom
+  ctx.fillRect(0, 1262, 720, 18);
+
+  // ORDER #
+  ctx.fillStyle = "#7A3B1E";
+  ctx.font = "bold 36px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`ORDER  #${orderNum}`, 360, 420);
+
+  // Dish name
+  ctx.fillStyle = "#161210";
+  ctx.font = "bold 72px 'Arial Narrow', Arial, sans-serif";
+  const dish = dishName(orderNum, genre);
+  // Word wrap
+  const words = dish.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (ctx.measureText(test).width > 640) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  lines.forEach((l, i) => ctx.fillText(`"${i === 0 ? "" : ""}${l}${i === lines.length - 1 ? '"' : ""}`, 360, 560 + i * 84));
+
+  // Tagline
+  ctx.fillStyle = "#161210";
+  ctx.globalAlpha = 0.4;
+  ctx.font = "28px Arial, sans-serif";
+  ctx.fillText("I ordered a track at", 360, 800);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#D6231F";
+  ctx.font = "bold 48px Arial, sans-serif";
+  ctx.fillText("tracksnack.live", 360, 860);
+
+  const link = document.createElement("a");
+  link.download = `tracksnack-order-${orderNum}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+const STATUS_TO_STEP: Record<string, number> = {
+  new: 0, lyrics: 1, writing: 1, style: 2, seasoning: 2, cooking: 3, generating: 3,
+};
+
 function OrderForm() {
   const [name, setName] = useState("");
   const [story, setStory] = useState("");
@@ -183,10 +242,49 @@ function OrderForm() {
   const [moods, setMoods] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [orderNum, setOrderNum] = useState<number | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [step, setStep] = useState(-1);
+  const [premierePhase, setPremierePhase] = useState<null | "countdown" | "live">(null);
+  const [countdown, setCountdown] = useState(5);
+  const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const toggleMood = (m: string) =>
     setMoods(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+
+  // Polling: check real backend status every 12s
+  useEffect(() => {
+    if (!orderId) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const s: string = (data.status ?? "").toLowerCase();
+        if (s === "ready" || s === "done" || s === "complete" || s.includes("ready")) {
+          clearInterval(pollRef.current!);
+          setPremierePhase("countdown");
+          return;
+        }
+        const mapped = STATUS_TO_STEP[s];
+        if (mapped !== undefined) setStep(prev => Math.max(prev, mapped));
+      } catch { /* ignore */ }
+    }, 12000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [orderId]);
+
+  // Countdown: 5 4 3 2 1 → live
+  useEffect(() => {
+    if (premierePhase !== "countdown") return;
+    setCountdown(5);
+    const t = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { clearInterval(t); setPremierePhase("live"); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [premierePhase]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,18 +303,19 @@ function OrderForm() {
       });
       const data = await res.json().catch(() => ({}));
       const raw = data?.id ?? data?.order_id;
-      // Backend ids are strings — fold into a 3-digit ticket number for the display
       const num = typeof raw === "number"
         ? raw
         : typeof raw === "string"
           ? [...raw].reduce((a, c) => a + c.charCodeAt(0), 0) % 900 + 100
           : Math.floor(Math.random() * 900 + 100);
       setOrderNum(num);
+      if (typeof raw === "string") setOrderId(raw);
       setStep(0);
-      STEP_DELAYS.forEach((delay, i) => {
-        if (i === 0) return;
-        setTimeout(() => setStep(i), delay);
-      });
+      // Simulate early steps; real status from polling overrides later
+      const timers = STEP_DELAYS.slice(1).map((delay, i) =>
+        setTimeout(() => setStep(prev => Math.max(prev, i + 1)), delay)
+      );
+      stepTimersRef.current = timers;
     } catch { /* ignore */ }
     setSending(false);
   };
@@ -234,11 +333,33 @@ function OrderForm() {
           Tell the chef what you&apos;re craving — describe the vibe, mood, or story and our DJs will cook it up.
         </p>
 
-        {step >= 0 ? (
+        {premierePhase === "countdown" ? (
+          <div className="order-premiere">
+            <p className="order-premiere__alert">ORDER #{orderNum} IS READY</p>
+            <p className="order-premiere__countdown">{countdown}</p>
+          </div>
+        ) : premierePhase === "live" ? (
+          <div className="order-premiere order-premiere--live">
+            <p className="order-premiere__world">WORLD PREMIERE</p>
+            {orderNum !== null && (
+              <p className="order-premiere__dish">"{dishName(orderNum, genre)}"</p>
+            )}
+            <div className="order-premiere__actions">
+              <button className="pill pill-red" onClick={() => { setPremierePhase(null); setStep(-1); setOrderId(null); }}>Serve it again</button>
+              <button className="pill pill-yellow" onClick={() => alert("Voted! Thanks.")}>Add to radio</button>
+              <button className="pill pill-paper" onClick={() => { setPremierePhase(null); setStep(-1); setOrderId(null); setOrderNum(null); }}>Send it back</button>
+            </div>
+            {orderNum !== null && (
+              <button className="order-premiere__share" onClick={() => shareOrder(orderNum, genre)}>
+                Share your order
+              </button>
+            )}
+          </div>
+        ) : step >= 0 ? (
           <div className="order-theater">
             <p className="order-theater__num">ORDER #{orderNum}</p>
             {orderNum !== null && (
-              <p className="order-theater__dish">“{dishName(orderNum, genre)}”</p>
+              <p className="order-theater__dish">"{dishName(orderNum, genre)}"</p>
             )}
             <ul className="order-theater__steps">
               {ORDER_STEPS.map((s, i) => (
@@ -1595,7 +1716,7 @@ export default function Home() {
       {/* ── Menu ───────────────────────────────── */}
       <section id="menu" className="rounded-xl px-5 md:px-12 py-12 md:py-16" style={{ background: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
-          <h2 className="display text-3xl md:text-5xl mb-2">Tonight&apos;s menu</h2>
+          <h2 className="display text-3xl md:text-5xl mb-2">Today&apos;s specials</h2>
           <p className="font-semibold opacity-70 mb-8">Thematic playlists from the kitchen — each one plays right here.</p>
           {playlists.length > 0 ? (
             <div className="playlist-row">
@@ -1624,7 +1745,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto">
           <h2 className="display text-3xl md:text-5xl mb-2">Fresh out of the kitchen</h2>
           <p className="font-semibold opacity-70 mb-8">
-            Picked from a 382-track pantry. Tap to taste.
+            Hot off the stove — tap to taste.
           </p>
           {freshTracks.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
