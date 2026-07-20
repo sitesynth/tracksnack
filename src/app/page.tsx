@@ -1691,10 +1691,12 @@ export default function Home() {
             </p>
             <div className="flex items-center justify-center gap-3 mb-5">
               <a href="#order-track" className="pill pill-yellow text-base">Order a song</a>
-              {streamUrl
-                ? <a href={streamUrl} target="_blank" rel="noopener noreferrer" className="pill pill-paper text-base">Listen live</a>
-                : <a href="#" className="pill pill-paper text-base" style={{ opacity: 0.4, pointerEvents: "none" }}>Listen live</a>
-              }
+              <a
+                href={streamUrl || "#"}
+                target={streamUrl ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                className="pill pill-paper text-base"
+              >Listen live</a>
             </div>
             <p className="hero__kitchen-status">
               <span className="hero__kitchen-dot" />
