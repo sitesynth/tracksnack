@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   try {
     const body = await req.json();
-    const payload = { name: CONFIG_NAME, ...body };
+    const payload = { name: CONFIG_NAME, tracks: [], ...body };
     const res = await fetch(`${VM}/snapshots`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Admin-Key": KEY },
