@@ -938,7 +938,7 @@ function PlaylistMiniPlayer({
 
   function seekTo(pct: number) {
     const a = audioRef.current;
-    if (!a || isNaN(a.duration)) return;
+    if (!a || !isFinite(a.duration) || a.duration <= 0) return;
     a.currentTime = pct * a.duration;
   }
 
@@ -1164,7 +1164,6 @@ export default function Home() {
      flips this pointer once the fade completes — it never reassigns .src on
      an already-playing element, which would force a reload/decode glitch. */
   const activeIsARef = useRef(true);
-  const [activeGen, setActiveGen] = useState(0);
   const active = useCallback(
     () => (activeIsARef.current ? audioRef.current : crossfadeRef.current),
     []
@@ -1259,7 +1258,6 @@ export default function Home() {
       fromEl.volume = 1;
       activeIsARef.current = !activeIsARef.current;
       crossfadingRef.current = false;
-      setActiveGen(g => g + 1);
       onComplete();
     }
     function step(now: number) {
@@ -1410,27 +1408,39 @@ export default function Home() {
   const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
-    const a = active();
-    if (!a) return;
+    const els = [audioRef.current, crossfadeRef.current].filter(
+      (el): el is HTMLAudioElement => el !== null
+    );
+    if (!els.length) return;
     const fmt = (s: number) =>
       `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-    const onTime = () => {
+    // Bound to BOTH elements permanently — filtering by "is this the active
+    // one right now" inside the handler avoids the race where React hasn't
+    // yet rebound listeners to the newly-active element after a crossfade
+    // flip, which let stale handlers double-fire on a reused element.
+    const onTime = (e: Event) => {
+      const a = e.currentTarget as HTMLAudioElement;
+      if (a !== active()) return;
       if (isNaN(a.duration)) return;
       setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
       setElapsed(fmt(a.currentTime));
       setProgress(a.duration > 0 ? a.currentTime / a.duration : 0);
     };
-    a.addEventListener("timeupdate", onTime);
-    a.addEventListener("loadedmetadata", onTime);
+    for (const el of els) {
+      el.addEventListener("timeupdate", onTime);
+      el.addEventListener("loadedmetadata", onTime);
+    }
     return () => {
-      a.removeEventListener("timeupdate", onTime);
-      a.removeEventListener("loadedmetadata", onTime);
+      for (const el of els) {
+        el.removeEventListener("timeupdate", onTime);
+        el.removeEventListener("loadedmetadata", onTime);
+      }
     };
-  }, [tracks.length > 0, activeGen]);
+  }, [tracks.length > 0]);
 
   function seekTo(pct: number) {
     const a = active();
-    if (!a || isNaN(a.duration)) return;
+    if (!a || !isFinite(a.duration) || a.duration <= 0) return;
     liveSyncRef.current = false;
     a.currentTime = pct * a.duration;
   }
@@ -1439,8 +1449,10 @@ export default function Home() {
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
   useEffect(() => {
-    const a = active();
-    if (!a) return;
+    const els = [audioRef.current, crossfadeRef.current].filter(
+      (el): el is HTMLAudioElement => el !== null
+    );
+    if (!els.length) return;
 
     // Crossfades into whatever comes next in the sequence: the next DJ
     // segment, or — once the segment queue is spent — the next track.
@@ -1483,9 +1495,15 @@ export default function Home() {
       }
     };
 
-    // Lookahead: start the crossfade CROSSFADE_MS before the current item
-    // ends, so the next one fades in over the tail instead of cutting in.
-    const onTimeUpdate = () => {
+    // Bound to BOTH elements permanently and filtered by "is this the
+    // active one right now" — see the progress-display effect above for why
+    // (avoids a stale-listener race across crossfade flips). A reused
+    // "inactive" element naturally fires timeupdate/ended once it starts
+    // playing the next queued segment; the filter keeps those from
+    // triggering a second, premature advance.
+    const onTimeUpdate = (e: Event) => {
+      const a = e.currentTarget as HTMLAudioElement;
+      if (a !== active()) return;
       if (crossfadingRef.current) return;
       if (!isFinite(a.duration) || a.duration <= 0) return;
       if (a.duration - a.currentTime <= CROSSFADE_MS / 1000 + 0.05) advance();
@@ -1493,7 +1511,9 @@ export default function Home() {
 
     // Fallback for loop mode (instant restart) and for clips shorter than
     // the crossfade window (lookahead never had a chance to fire).
-    const onEnded = () => {
+    const onEnded = (e: Event) => {
+      const a = e.currentTarget as HTMLAudioElement;
+      if (a !== active()) return;
       if (crossfadingRef.current) return;
       if (playModeRef.current === "loop" && !djQueueRef.current) {
         a.currentTime = 0;
@@ -1503,13 +1523,17 @@ export default function Home() {
       advance();
     };
 
-    a.addEventListener("timeupdate", onTimeUpdate);
-    a.addEventListener("ended", onEnded);
+    for (const el of els) {
+      el.addEventListener("timeupdate", onTimeUpdate);
+      el.addEventListener("ended", onEnded);
+    }
     return () => {
-      a.removeEventListener("timeupdate", onTimeUpdate);
-      a.removeEventListener("ended", onEnded);
+      for (const el of els) {
+        el.removeEventListener("timeupdate", onTimeUpdate);
+        el.removeEventListener("ended", onEnded);
+      }
     };
-  }, [tracks, activeGen]);
+  }, [tracks]);
 
   useEffect(() => {
     const el = songTitleRef.current;
