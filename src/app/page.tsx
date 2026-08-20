@@ -1153,8 +1153,26 @@ function PlaylistMiniPlayer({
   );
 }
 
+const CROSSFADE_MS = 900;
+
 export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const crossfadeRef = useRef<HTMLAudioElement>(null);
+  const crossfadingRef = useRef(false);
+  const skipNextLoadRef = useRef(false);
+  /* Which of the two <audio> elements is "front" right now. Crossfading just
+     flips this pointer once the fade completes — it never reassigns .src on
+     an already-playing element, which would force a reload/decode glitch. */
+  const activeIsARef = useRef(true);
+  const [activeGen, setActiveGen] = useState(0);
+  const active = useCallback(
+    () => (activeIsARef.current ? audioRef.current : crossfadeRef.current),
+    []
+  );
+  const inactive = useCallback(
+    () => (activeIsARef.current ? crossfadeRef.current : audioRef.current),
+    []
+  );
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const songTitleRef = useRef<HTMLSpanElement>(null);
   const nextTitleRef = useRef<HTMLSpanElement>(null);
@@ -1177,9 +1195,101 @@ export default function Home() {
   const liveSyncRef = useRef(true);
   const pendingSeekRef = useRef<number | null>(null);
 
+  /* DJ intros + jingles: played on the shared audioRef between auto-advancing
+     tracks only — manual prev/next stays an instant track switch. */
+  const djManifestRef = useRef<{ intros: Set<string>; jingles: string[] }>({ intros: new Set(), jingles: [] });
+  const djQueueRef = useRef<{ segs: string[]; idx: number; nextIdx: number } | null>(null);
+  const trackIdxRef = useRef(0);
+  useEffect(() => { trackIdxRef.current = trackIdx; }, [trackIdx]);
+
+  useEffect(() => {
+    fetch("/api/dj-manifest")
+      .then(r => r.json())
+      .then(d => {
+        djManifestRef.current = { intros: new Set(d.intros ?? []), jingles: d.jingles ?? [] };
+      })
+      .catch(() => {});
+  }, []);
+
+  function djPrerollFor(track: Track): string[] {
+    const segs: string[] = [];
+    const { intros, jingles } = djManifestRef.current;
+    if (jingles.length && Math.random() < 0.15) {
+      const j = jingles[Math.floor(Math.random() * jingles.length)];
+      segs.push(`/api/dj-audio/jingles/${encodeURIComponent(j)}`);
+    }
+    if (intros.has(track.id)) {
+      segs.push(`/api/dj-audio/dj-cache/${track.id}.mp3`);
+    }
+    return segs;
+  }
+
+  /* Crossfades from whichever <audio> is currently front into nextSrc on the
+     other one, then flips which element is "active" — never reassigns .src
+     on the element that's mid-playback, which would force a reload/decode
+     glitch. Every control (scrubber, mediaSession, advance...) reads through
+     active()/inactive() so it automatically follows the flip. onComplete
+     fires at flip time — callers update React state (trackIdx / djQueueRef)
+     there to match. */
+  function crossfadeTo(nextSrc: string, onComplete: () => void) {
+    const from = active();
+    const to = inactive();
+    if (!from || !to) { onComplete(); return; }
+    const fromEl: HTMLAudioElement = from;
+    const toEl: HTMLAudioElement = to;
+    crossfadingRef.current = true;
+    const startVol = fromEl.volume || 1;
+    toEl.src = nextSrc;
+    toEl.currentTime = 0;
+    toEl.volume = 0;
+    toEl.play().catch(() => {});
+    const start = performance.now();
+    let rafId = 0;
+    let committed = false;
+    // Commits exactly once: flips which element is "active" and resets the
+    // guard. Called either by the rAF ramp reaching t=1, or — if rAF stalls
+    // (e.g. the tab is backgrounded, where browsers throttle/pause rAF) — by
+    // the setTimeout fallback below, so the player never gets stuck mid-fade.
+    function commit() {
+      if (committed) return;
+      committed = true;
+      cancelAnimationFrame(rafId);
+      toEl.volume = 1;
+      fromEl.pause();
+      fromEl.volume = 1;
+      activeIsARef.current = !activeIsARef.current;
+      crossfadingRef.current = false;
+      setActiveGen(g => g + 1);
+      onComplete();
+    }
+    function step(now: number) {
+      const t = Math.max(0, Math.min(1, (now - start) / CROSSFADE_MS));
+      toEl.volume = t;
+      fromEl.volume = Math.max(0, startVol * (1 - t));
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
+        commit();
+      }
+    }
+    rafId = requestAnimationFrame(step);
+    setTimeout(commit, CROSSFADE_MS + 150);
+  }
+
   const selectTrack = (i: number | ((i: number) => number)) => {
     liveSyncRef.current = false;
-    setTrackIdx(i);
+    const targetIdx = typeof i === "function" ? i(trackIdxRef.current) : i;
+    const targetTrack = tracks[targetIdx];
+    if (playing && targetTrack && !crossfadingRef.current) {
+      djQueueRef.current = null;
+      crossfadeTo(targetTrack.audioUrl, () => {
+        skipNextLoadRef.current = true;
+        setTrackIdx(targetIdx);
+      });
+    } else {
+      djQueueRef.current = null;
+      setTrackIdx(targetIdx);
+    }
   };
 
   function applySeek(a: HTMLAudioElement, offset: number) {
@@ -1196,7 +1306,7 @@ export default function Home() {
 
   // Pause any active mini-player before the main player starts
   function handleBeforePlay(newAudio: HTMLAudioElement) {
-    const mainAudio = audioRef.current;
+    const mainAudio = active();
     if (mainAudio && !mainAudio.paused) {
       mainAudio.pause();
       mainAudio.volume = 1;
@@ -1251,19 +1361,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const a = audioRef.current;
+    const a = active();
     if (!a || !tracks.length) return;
     const track = tracks[trackIdx];
-    a.src = track?.audioUrl ?? "";
+    if (skipNextLoadRef.current) {
+      skipNextLoadRef.current = false;
+    } else {
+      a.src = track?.audioUrl ?? "";
+      const seek = pendingSeekRef.current;
+      if (seek !== null) {
+        pendingSeekRef.current = null;
+        if (seek > 2) applySeek(a, seek);
+      }
+      if (playing) a.play().catch(() => {});
+    }
     setRemaining("");
     setProgress(0);
     setElapsed("");
-    const seek = pendingSeekRef.current;
-    if (seek !== null) {
-      pendingSeekRef.current = null;
-      if (seek > 2) applySeek(a, seek);
-    }
-    if (playing) a.play().catch(() => {});
     if ("mediaSession" in navigator && track) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
@@ -1281,8 +1395,8 @@ export default function Home() {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !tracks.length) return;
     const n = tracks.length;
-    navigator.mediaSession.setActionHandler("play", () => { audioRef.current?.play().catch(() => {}); setPlaying(true); });
-    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current?.pause(); setPlaying(false); });
+    navigator.mediaSession.setActionHandler("play", () => { active()?.play().catch(() => {}); setPlaying(true); });
+    navigator.mediaSession.setActionHandler("pause", () => { active()?.pause(); setPlaying(false); });
     navigator.mediaSession.setActionHandler("previoustrack", () => selectTrack(i => (i - 1 + n) % n));
     navigator.mediaSession.setActionHandler("nexttrack", () => selectTrack(i => (i + 1) % n));
     return () => {
@@ -1296,7 +1410,7 @@ export default function Home() {
   const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
-    const a = audioRef.current;
+    const a = active();
     if (!a) return;
     const fmt = (s: number) =>
       `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -1312,10 +1426,10 @@ export default function Home() {
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("loadedmetadata", onTime);
     };
-  }, [tracks.length > 0]);
+  }, [tracks.length > 0, activeGen]);
 
   function seekTo(pct: number) {
-    const a = audioRef.current;
+    const a = active();
     if (!a || isNaN(a.duration)) return;
     liveSyncRef.current = false;
     a.currentTime = pct * a.duration;
@@ -1325,23 +1439,77 @@ export default function Home() {
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
   useEffect(() => {
-    const a = audioRef.current;
+    const a = active();
     if (!a) return;
-    const onEnded = () => {
+
+    // Crossfades into whatever comes next in the sequence: the next DJ
+    // segment, or — once the segment queue is spent — the next track.
+    const advance = () => {
+      if (crossfadingRef.current) return;
+      const q = djQueueRef.current;
+      if (q) {
+        const nextSegIdx = q.idx + 1;
+        if (nextSegIdx < q.segs.length) {
+          crossfadeTo(q.segs[nextSegIdx], () => {
+            djQueueRef.current = { ...q, idx: nextSegIdx };
+          });
+          return;
+        }
+        const nextTrack = tracks[q.nextIdx];
+        if (!nextTrack) return;
+        crossfadeTo(nextTrack.audioUrl, () => {
+          djQueueRef.current = null;
+          skipNextLoadRef.current = true;
+          setTrackIdx(q.nextIdx);
+        });
+        return;
+      }
       const n = tracks.length || 1;
       const mode = playModeRef.current;
-      if (mode === "loop") {
-        a.currentTime = 0;
-        a.play().catch(() => {});
-      } else if (mode === "random") {
-        setTrackIdx(Math.floor(Math.random() * n));
+      if (mode === "loop") return;
+      const nextIdx = mode === "random" ? Math.floor(Math.random() * n) : (trackIdxRef.current + 1) % n;
+      const nextTrack = tracks[nextIdx];
+      if (!nextTrack) return;
+      const preroll = djPrerollFor(nextTrack);
+      if (preroll.length) {
+        crossfadeTo(preroll[0], () => {
+          djQueueRef.current = { segs: preroll, idx: 0, nextIdx };
+        });
       } else {
-        setTrackIdx(i => (i + 1) % n);
+        crossfadeTo(nextTrack.audioUrl, () => {
+          skipNextLoadRef.current = true;
+          setTrackIdx(nextIdx);
+        });
       }
     };
+
+    // Lookahead: start the crossfade CROSSFADE_MS before the current item
+    // ends, so the next one fades in over the tail instead of cutting in.
+    const onTimeUpdate = () => {
+      if (crossfadingRef.current) return;
+      if (!isFinite(a.duration) || a.duration <= 0) return;
+      if (a.duration - a.currentTime <= CROSSFADE_MS / 1000 + 0.05) advance();
+    };
+
+    // Fallback for loop mode (instant restart) and for clips shorter than
+    // the crossfade window (lookahead never had a chance to fire).
+    const onEnded = () => {
+      if (crossfadingRef.current) return;
+      if (playModeRef.current === "loop" && !djQueueRef.current) {
+        a.currentTime = 0;
+        a.play().catch(() => {});
+        return;
+      }
+      advance();
+    };
+
+    a.addEventListener("timeupdate", onTimeUpdate);
     a.addEventListener("ended", onEnded);
-    return () => a.removeEventListener("ended", onEnded);
-  }, [tracks]);
+    return () => {
+      a.removeEventListener("timeupdate", onTimeUpdate);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, [tracks, activeGen]);
 
   useEffect(() => {
     const el = songTitleRef.current;
@@ -1361,11 +1529,12 @@ export default function Home() {
   // playing: open the full-screen player instead of landing on the page.
   useEffect(() => {
     const onVisible = () => {
+      const a = active();
       if (
         document.visibilityState === "visible" &&
         window.matchMedia("(max-width: 767px)").matches &&
-        audioRef.current &&
-        !audioRef.current.paused
+        a &&
+        !a.paused
       ) {
         setExpanded(true);
       }
@@ -1410,7 +1579,7 @@ export default function Home() {
   }, [tracks.length]);
 
   function toggle() {
-    const a = audioRef.current;
+    const a = active();
     if (!a) return;
     if (playing) {
       setPlaying(false);
@@ -1545,6 +1714,7 @@ export default function Home() {
               OPEN 24/7
             </span>
             <audio ref={audioRef} preload="none" />
+            <audio ref={crossfadeRef} preload="none" />
             <div className="relative aspect-square w-full max-w-80 md:max-w-[26rem] mx-auto mb-6">
               <div className="absolute inset-[6%] rounded-full overflow-hidden">
                 <img
