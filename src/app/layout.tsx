@@ -23,7 +23,11 @@ export const metadata: Metadata = {
   title: "TrackSnack — Fresh Songs, Cooked Live | Custom AI Music",
   description:
     "Order a custom AI song about anything — any topic, any genre, cooked live in minutes. Interactive music radio where the audience writes the menu.",
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
   openGraph: {
     title: "TrackSnack — Fresh Songs, Cooked Live | Custom AI Music",
     description:

@@ -882,9 +882,21 @@ function PlaylistMiniPlayer({
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
       artist: name,
-      artwork: track.image_url ? [{ src: track.image_url, sizes: "512x512" }] : [],
+      // No `sizes`/`type`: cover art comes from Suno at whatever aspect
+      // ratio it was rendered at (not the square shape the field name
+      // implies) — a declared size that doesn't match the real image is
+      // why iOS silently drops the artwork instead of just scaling it.
+      artwork: track.image_url ? [{ src: track.image_url }] : [],
     });
     navigator.mediaSession.playbackState = "playing";
+    // This mini-player owns its own <audio> element, separate from the
+    // main radio player's. Without claiming the handlers here too, the
+    // lock screen's play/pause keeps acting on the main player — which
+    // isn't the thing actually making sound — so playback looks stuck.
+    navigator.mediaSession.setActionHandler("play", () => { audioRef.current?.play().catch(() => {}); setPlaying(true); });
+    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current?.pause(); setPlaying(false); });
+    navigator.mediaSession.setActionHandler("previoustrack", () => skip(-1));
+    navigator.mediaSession.setActionHandler("nexttrack", () => skip(1));
   }, [playing, idx, tracks, name]);
 
   useEffect(() => {
@@ -1380,7 +1392,10 @@ export default function Home() {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
         artist: AUTHOR,
-        artwork: track.imageUrl ? [{ src: track.imageUrl, sizes: "512x512" }] : [],
+        // No `sizes`: cover art isn't actually square, and a declared size
+        // that doesn't match the real image makes iOS drop the artwork
+        // instead of just scaling it.
+        artwork: track.imageUrl ? [{ src: track.imageUrl }] : [],
       });
     }
   }, [trackIdx, tracks]);
@@ -1523,14 +1538,26 @@ export default function Home() {
       advance();
     };
 
+    // A track whose source 404s/403s (dead CDN link) never fires timeupdate
+    // or ended — it just sits silently "playing" forever. Advance past it
+    // like it ended, so the station keeps moving instead of going mute.
+    const onError = (e: Event) => {
+      const a = e.currentTarget as HTMLAudioElement;
+      if (a !== active()) return;
+      if (crossfadingRef.current) return;
+      advance();
+    };
+
     for (const el of els) {
       el.addEventListener("timeupdate", onTimeUpdate);
       el.addEventListener("ended", onEnded);
+      el.addEventListener("error", onError);
     }
     return () => {
       for (const el of els) {
         el.removeEventListener("timeupdate", onTimeUpdate);
         el.removeEventListener("ended", onEnded);
+        el.removeEventListener("error", onError);
       }
     };
   }, [tracks]);
