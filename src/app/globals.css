@@ -1145,6 +1145,7 @@ body {
 
 /* ── Comments panel ── */
 .comments-panel {
+  width: 100%;
   margin-top: 0.75rem;
   border: 2px solid var(--ink);
   border-radius: 1rem;
@@ -1289,7 +1290,7 @@ body {
   font-size: 0.85rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.4;
+  opacity: 0.6;
   padding-left: 0.5rem;
 }
 

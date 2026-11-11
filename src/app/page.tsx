@@ -628,7 +628,7 @@ function TrackComments({ trackId }: { trackId: string }) {
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <button
         onClick={() => setOpen(!open)}
         className="chip"
@@ -726,6 +726,10 @@ function PlaylistMiniPlayer({
   const [playMode, setPlayMode] = useState<"seq" | "loop" | "random">("seq");
   const shouldPlayRef = useRef(false);
   const tracksLenRef = useRef(0);
+  const tracksRef = useRef<RawTrack[]>(initialTracks ?? []);
+  const idxRef = useRef(0);
+  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
   const playModeRef = useRef(playMode);
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
@@ -773,30 +777,58 @@ function PlaylistMiniPlayer({
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
-      const len = Math.max(1, tracksLenRef.current);
+      const list = tracksRef.current;
+      const len = Math.max(1, list.length);
+      const cur = idxRef.current;
       if (playModeRef.current === "loop") {
         a.currentTime = 0;
         a.play().catch(() => {});
-      } else if (playModeRef.current === "random") {
-        setIdx(i => (len < 2 ? i : (i + 1 + Math.floor(Math.random() * (len - 1))) % len));
-      } else {
-        setIdx(i => (i + 1) % len);
+        return;
       }
+      const next = playModeRef.current === "random"
+        ? (len < 2 ? cur : (cur + 1 + Math.floor(Math.random() * (len - 1))) % len)
+        : (cur + 1) % len;
+      if (next !== cur && list[next]) {
+        // Start the next track right here, inside the ended event. Waiting
+        // for React to re-render and run an effect lets a locked phone
+        // suspend the page between tracks, which silently stops the music.
+        a.src = list[next].audio_url;
+        a.play().catch(() => {});
+      }
+      setIdx(next);
+    };
+    // A dead source never fires `ended`, so the player would sit "playing"
+    // in silence. Skip to the next track — but give up once every track in
+    // a row has failed so a fully broken list can't spin forever.
+    let errStreak = 0;
+    const onPlaying = () => { errStreak = 0; };
+    const onError = () => {
+      if (!shouldPlayRef.current || !a.getAttribute("src")) return;
+      if (++errStreak >= tracksRef.current.length) {
+        shouldPlayRef.current = false;
+        return;
+      }
+      onEnded();
     };
     a.addEventListener("play", onPlay);
     a.addEventListener("pause", onPause);
     a.addEventListener("ended", onEnded);
+    a.addEventListener("playing", onPlaying);
+    a.addEventListener("error", onError);
     return () => {
       a.removeEventListener("play", onPlay);
       a.removeEventListener("pause", onPause);
       a.removeEventListener("ended", onEnded);
+      a.removeEventListener("playing", onPlaying);
+      a.removeEventListener("error", onError);
     };
   }, []);
 
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !tracks.length) return;
-    a.src = tracks[idx]?.audio_url ?? "";
+    const src = tracks[idx]?.audio_url ?? "";
+    if (a.getAttribute("src") !== src) a.src = src;
     if (shouldPlayRef.current) a.play().catch(() => {});
   }, [idx, tracks]);
 
@@ -1019,7 +1051,7 @@ function PlaylistMiniPlayer({
               {playing && <span className="now-shelf__dot ml-2 inline-block" />}
             </p>
             <p className="player-fs__author" style={{ color: "var(--ink)", textDecoration: "none", opacity: 0.55 }}>
-              {curr.ordered_for ? `${name} · for ${curr.ordered_for}` : name}
+              {curr.ordered_for ? `${name} — for ${curr.ordered_for}` : name}
             </p>
             {(genre || currMeta) && (
               <div className="player-card__meta">
@@ -1037,6 +1069,11 @@ function PlaylistMiniPlayer({
                 onClick={() => toggleLike(curr.id)}
                 aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
               >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
+            </div>
+            <Scrubber progress={progress} seekTo={seekTo} />
+            <div className="player__scrubber-time">
+              <span>{elapsed || "0:00"}</span>
+              <span>{remaining || fmtDuration(curr.duration)}</span>
             </div>
             {nextTrack && (
               <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
@@ -1070,8 +1107,8 @@ function PlaylistMiniPlayer({
               <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
           </button>
-          <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.7rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.4, alignSelf: "flex-start" }}>
-            {curr.ordered_for ? `${name} · for ${curr.ordered_for}` : name}
+          <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.78rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.6, alignSelf: "flex-start" }}>
+            {curr.ordered_for ? `${name} — for ${curr.ordered_for}` : name}
           </p>
           <div className="player-card__cover">
             <img src={croppedCover || displayCover} alt={curr.title} />
@@ -1129,6 +1166,11 @@ function PlaylistMiniPlayer({
 
 const CROSSFADE_MS = 900;
 
+// 0.1s of silence. Played once on the first tap so the *second* <audio>
+// element counts as user-activated: phones only let an element start by
+// itself later (next track, DJ intro, screen locked) if a tap started it once.
+const SILENT_WAV = "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
+
 export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const crossfadeRef = useRef<HTMLAudioElement>(null);
@@ -1147,6 +1189,7 @@ export default function Home() {
     []
   );
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const primedRef = useRef(false);
   const songTitleRef = useRef<HTMLSpanElement>(null);
   const nextTitleRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -1591,6 +1634,19 @@ export default function Home() {
     });
   }, [tracks.length]);
 
+  function primeInactiveAudio() {
+    if (primedRef.current) return;
+    primedRef.current = true;
+    const el = inactive();
+    if (!el || el.getAttribute("src")) return;
+    el.src = SILENT_WAV;
+    el.play().then(() => {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+    }).catch(() => {});
+  }
+
   function toggle() {
     const a = active();
     if (!a) return;
@@ -1598,6 +1654,7 @@ export default function Home() {
       setPlaying(false);
       a.pause();
     } else {
+      primeInactiveAudio();
       if (activeAudioRef.current && !activeAudioRef.current.paused) {
         activeAudioRef.current.pause();
       }
@@ -1909,8 +1966,8 @@ export default function Home() {
       {/* ── Menu ───────────────────────────────── */}
       <section id="menu" className="rounded-xl px-5 md:px-12 py-12 md:py-16" style={{ background: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
-          <h2 className="display text-3xl md:text-5xl mb-2">Today&apos;s specials</h2>
-          <p className="font-semibold opacity-70 mb-8">Thematic playlists from the kitchen — each one plays right here.</p>
+          <h2 className="display text-3xl md:text-5xl mb-2 text-center">Today&apos;s specials</h2>
+          <p className="font-semibold opacity-70 mb-8 text-center">Thematic playlists from the kitchen — each one plays right here.</p>
           {playlists.length > 0 ? (
             <div className="playlist-row">
               {playlists.map(pl => (
@@ -1936,8 +1993,8 @@ export default function Home() {
       {/* ── Fresh out of the kitchen ───────────── */}
       <section id="fresh" className="rounded-xl px-5 md:px-12 py-12 md:py-16" style={{ background: "var(--paper)" }}>
         <div className="max-w-5xl mx-auto">
-          <h2 className="display text-3xl md:text-5xl mb-2">Fresh out of the kitchen</h2>
-          <p className="font-semibold opacity-70 mb-8">
+          <h2 className="display text-3xl md:text-5xl mb-2 text-center">Fresh out of the kitchen</h2>
+          <p className="font-semibold opacity-70 mb-8 text-center">
             Hot off the stove — tap to taste.
           </p>
           {freshTracks.length > 0 ? (

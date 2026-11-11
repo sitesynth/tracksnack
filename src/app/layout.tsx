@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Alfa_Slab_One, Oswald, Overpass } from "next/font/google";
 import "./globals.css";
 
@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
+  appleWebApp: { capable: true, title: "TrackSnack", statusBarStyle: "default" },
   openGraph: {
     title: "TrackSnack — Fresh Songs, Cooked Live | Custom AI Music",
     description:
@@ -38,6 +39,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: ["/og-image.jpg"],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FFD731",
 };
 
 export default function RootLayout({
