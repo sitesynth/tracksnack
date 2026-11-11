@@ -20,6 +20,9 @@ type RawTrack = {
   audio_url: string;
   image_url: string;
   duration: number;
+  ordered_for?: string;
+  /** Our own editorial blurb about the track, shown in the expanded player. */
+  description?: string;
 };
 
 type Playlist = {
@@ -687,94 +690,6 @@ function useCroppedCover(url?: string): string | undefined {
   return cover;
 }
 
-function FreshTrackCard({ track, onBeforePlay }: { track: Track; onBeforePlay: (a: HTMLAudioElement) => void }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const croppedCover = useCroppedCover(track.imageUrl);
-  const meta = useTrackMeta(track.id);
-  const genre = meta ? genreLabel(meta.tags) : track.genre;
-
-  const toggle = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (playing) {
-      a.pause();
-      setPlaying(false);
-    } else {
-      onBeforePlay(a);
-      a.src = track.audioUrl;
-      a.play().catch(() => {});
-      setPlaying(true);
-    }
-  }, [playing, track.audioUrl, onBeforePlay]);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    const onPause = () => setPlaying(false);
-    const onEnd = () => setPlaying(false);
-    a.addEventListener("pause", onPause);
-    a.addEventListener("ended", onEnd);
-    return () => { a.removeEventListener("pause", onPause); a.removeEventListener("ended", onEnd); };
-  }, []);
-
-  return (
-    <>
-      {expanded && (
-        <div className="player-fs" style={{ display: "flex" }}>
-          <div className="player-fs__topbar">
-            <span className="player-fs__playlist-name">Fresh</span>
-            <button className="player-fs__close" onClick={() => setExpanded(false)} aria-label="Close">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className="player-fs__artwork">
-            <img src={croppedCover || track.imageUrl} alt={track.title} className="player-fs__img" />
-          </div>
-          <div className="player-fs__body">
-            <p className="player-fs__song">{track.title}{playing && <span className="now-shelf__dot ml-2 inline-block" />}</p>
-            {(genre || meta) && (
-              <div className="player-card__meta">
-                {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
-                {meta && <ArtistChip meta={meta} />}
-                </div>
-            )}
-            <div className="player__controls" style={{ justifyContent: "center" }}>
-              <button onClick={toggle} className="player__play" aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
-            </div>
-            <TrackComments trackId={track.id} />
-          </div>
-        </div>
-      )}
-      <div className="panel flex items-center gap-4 !p-4">
-        <audio ref={audioRef} preload="none" />
-        <button
-          onClick={() => setExpanded(true)}
-          className="w-14 h-14 rounded-xl border-2 shrink-0 overflow-hidden"
-          style={{ borderColor: "var(--ink)", padding: 0, background: "none", cursor: "pointer", border: "2px solid var(--ink)" }}
-        >
-          <img src={croppedCover || track.imageUrl} alt={track.title} className="w-full h-full object-cover block" />
-        </button>
-        <div className="min-w-0">
-          <p className="display text-base truncate">{track.title}</p>
-          <p className="menu-type text-sm opacity-60">{genre}</p>
-        </div>
-        <button
-          aria-label={playing ? "Pause" : `Play ${track.title}`}
-          onClick={toggle}
-          className="player__play ml-auto shrink-0"
-        >
-          {playing ? "❚❚" : "▶"}
-        </button>
-      </div>
-    </>
-  );
-}
-
 function PlaylistMiniPlayer({
   playlistId,
   coverUrl,
@@ -782,6 +697,8 @@ function PlaylistMiniPlayer({
   description,
   accent,
   onBeforePlay,
+  initialTracks,
+  compact,
 }: {
   playlistId: string;
   coverUrl: string;
@@ -789,12 +706,16 @@ function PlaylistMiniPlayer({
   description?: string;
   accent?: string;
   onBeforePlay: (audio: HTMLAudioElement) => void;
+  /** Pre-loaded tracks (skips the custom-playlist fetch) — used by Fresh. */
+  initialTracks?: RawTrack[];
+  /** Collapsed state as a single compact row instead of the playlist card. */
+  compact?: boolean;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [tracks, setTracks] = useState<RawTrack[]>([]);
+  const [tracks, setTracks] = useState<RawTrack[]>(initialTracks ?? []);
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialTracks);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(false);
@@ -809,15 +730,19 @@ function PlaylistMiniPlayer({
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
   useEffect(() => {
-    fetch(`/api/custom-playlists/${playlistId}/tracks`)
-      .then(r => r.json())
-      .then(d => {
-        const arr = Array.isArray(d) ? d : [];
-        setTracks(arr);
-        tracksLenRef.current = arr.length;
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    if (initialTracks) {
+      tracksLenRef.current = initialTracks.length;
+    } else {
+      fetch(`/api/custom-playlists/${playlistId}/tracks`)
+        .then(r => r.json())
+        .then(d => {
+          const arr = Array.isArray(d) ? d : [];
+          setTracks(arr);
+          tracksLenRef.current = arr.length;
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
     fetch("/api/likes").then(r => r.json()).then(setLikeCounts).catch(() => {});
     try {
       const raw = localStorage.getItem("ts-liked-ids");
@@ -984,7 +909,39 @@ function PlaylistMiniPlayer({
   const nextMeta = useTrackMeta(nextTrack?.id);
   const genre = currMeta ? genreLabel(currMeta.tags) : "";
 
-  const miniCard = (
+  const compactCard = curr && (
+    <div className="panel flex items-center gap-3 md:gap-4 !p-4 w-full max-w-xl">
+      <button
+        onClick={() => setExpanded(true)}
+        aria-label="Expand player"
+        className="w-14 h-14 rounded-xl border-2 shrink-0 overflow-hidden"
+        style={{ borderColor: "var(--ink)", padding: 0, background: "none", cursor: "pointer", border: "2px solid var(--ink)" }}
+      >
+        <img src={croppedCover || displayCover} alt={curr.title} className="w-full h-full object-cover block" />
+      </button>
+      <div className="min-w-0 flex-1">
+        <p className="display text-base truncate">{curr.title}</p>
+        <p className="menu-type text-sm opacity-60">{genre}</p>
+        {curr.ordered_for && <p className="menu-type text-sm" style={{ color: "var(--red)" }}>for {curr.ordered_for}</p>}
+      </div>
+      <button
+        className={`player__like player__like--lg shrink-0${likedIds.has(curr.id) ? " is-liked" : ""}`}
+        onClick={() => toggleLike(curr.id)}
+        aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+      >
+        {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+      </button>
+      <button
+        aria-label={playing ? "Pause" : `Play ${curr.title}`}
+        onClick={toggle}
+        className="player__play shrink-0"
+      >
+        {playing ? "❚❚" : "▶"}
+      </button>
+    </div>
+  );
+
+  const miniCard = compact && compactCard ? compactCard : (
     <div className="playlist-mini">
       <div
         className="playlist-mini__band"
@@ -1062,7 +1019,7 @@ function PlaylistMiniPlayer({
               {playing && <span className="now-shelf__dot ml-2 inline-block" />}
             </p>
             <p className="player-fs__author" style={{ color: "var(--ink)", textDecoration: "none", opacity: 0.55 }}>
-              {name}
+              {curr.ordered_for ? `${name} · for ${curr.ordered_for}` : name}
             </p>
             {(genre || currMeta) && (
               <div className="player-card__meta">
@@ -1070,6 +1027,7 @@ function PlaylistMiniPlayer({
                 {currMeta && <ArtistChip meta={currMeta} />}
               </div>
             )}
+            {curr.description && <p className="player-desc">{curr.description}</p>}
             <div className="player__controls" style={{ justifyContent: "center" }}>
               <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
               <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
@@ -1098,7 +1056,10 @@ function PlaylistMiniPlayer({
 
       {/* Desktop: expanded = player-card inline; collapsed = mini card */}
       {expanded && isDesktop && curr ? (
-        <div className="player-card" style={{ maxWidth: "30rem", margin: "0 auto" }}>
+        <div
+          className="player-card"
+          style={{ maxWidth: "30rem", margin: "0 auto", ...(compact ? { width: "100%" } : {}) }}
+        >
           <button
             className="player-card__close"
             onClick={() => setExpanded(false)}
@@ -1110,7 +1071,7 @@ function PlaylistMiniPlayer({
             </svg>
           </button>
           <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.7rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.4, alignSelf: "flex-start" }}>
-            {name}
+            {curr.ordered_for ? `${name} · for ${curr.ordered_for}` : name}
           </p>
           <div className="player-card__cover">
             <img src={croppedCover || displayCover} alt={curr.title} />
@@ -1123,6 +1084,7 @@ function PlaylistMiniPlayer({
             {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
             {currMeta && <ArtistChip meta={currMeta} />}
           </div>
+          {curr.description && <p className="player-desc">{curr.description}</p>}
           <div className="player__controls" style={{ justifyContent: "center" }}>
             <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
             <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
@@ -1196,7 +1158,7 @@ export default function Home() {
   const [remaining, setRemaining] = useState<string>("");
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [freshTracks, setFreshTracks] = useState<Track[]>([]);
+  const [freshTracks, setFreshTracks] = useState<RawTrack[]>([]);
   const [tipOpen, setTipOpen] = useState(false);
   const [streamUrl, setStreamUrl] = useState("");
 
@@ -1361,7 +1323,7 @@ export default function Home() {
     fetch("/api/fresh")
       .then(r => r.json())
       .then(d => {
-        if (d.tracks && Array.isArray(d.tracks)) setFreshTracks(mapTracks(d.tracks));
+        if (d.tracks && Array.isArray(d.tracks)) setFreshTracks(d.tracks);
       })
       .catch(() => {});
     fetch("/api/config")
@@ -1979,9 +1941,17 @@ export default function Home() {
             Hot off the stove — tap to taste.
           </p>
           {freshTracks.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            <div className="flex flex-col items-center gap-3 md:gap-4">
               {freshTracks.map((t) => (
-                <FreshTrackCard key={t.id} track={t} onBeforePlay={handleBeforePlay} />
+                <PlaylistMiniPlayer
+                  key={t.id}
+                  playlistId={`fresh-${t.id}`}
+                  coverUrl={t.image_url}
+                  name="Fresh"
+                  onBeforePlay={handleBeforePlay}
+                  initialTracks={[t]}
+                  compact
+                />
               ))}
             </div>
           ) : (

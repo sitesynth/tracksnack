@@ -578,6 +578,28 @@ body {
   color: var(--ink);
 }
 
+/* Editorial description block inside the expanded players */
+.player-desc {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
+  opacity: 0.8;
+  max-width: 26rem;
+  white-space: pre-line;
+}
+
+/* Large like button used in the Fresh list rows */
+.player__like--lg {
+  height: 3rem;
+  padding: 0 1.1rem;
+  font-size: 1.15rem;
+  gap: 0.4rem;
+  box-shadow: 0 3px 0 0 var(--ink);
+}
+.player__like--lg:active { box-shadow: none; transform: translateY(3px); }
+
 .player__modes {
   display: flex;
   justify-content: center;
