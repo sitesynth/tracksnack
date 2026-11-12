@@ -1526,6 +1526,11 @@ export default function Home() {
       if (a !== active()) return;
       if (crossfadingRef.current) return;
       if (!isFinite(a.duration) || a.duration <= 0) return;
+      // A DJ announcer insert must never be faded out under its own last words:
+      // the early look-ahead crossfade would swallow them. Let it finish; the
+      // `ended` handler then advances to the track.
+      const q = djQueueRef.current;
+      if (q && q.segs[q.idx]?.includes("/dj-cache/")) return;
       if (a.duration - a.currentTime <= CROSSFADE_MS / 1000 + 0.05) advance();
     };
 
