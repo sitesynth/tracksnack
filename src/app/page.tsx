@@ -897,6 +897,27 @@ function SearchIcon() {
 
 type SearchHit = RawTrack & { source: { key: string; name: string } };
 
+/* A die drawn in the site's flat-3D style (hard extrusion), showing 1–6 pips. */
+const PIPS: Record<number, [number, number][]> = {
+  1: [[12, 12]],
+  2: [[8, 8], [16, 16]],
+  3: [[8, 8], [12, 12], [16, 16]],
+  4: [[8, 8], [16, 8], [8, 16], [16, 16]],
+  5: [[8, 8], [16, 8], [12, 12], [8, 16], [16, 16]],
+  6: [[8, 8], [16, 8], [8, 12], [16, 12], [8, 16], [16, 16]],
+};
+function DiceIcon({ face }: { face: number }) {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden style={{ overflow: "visible" }}>
+      <rect x="4.2" y="4.2" width="17" height="17" rx="4" fill="currentColor" />
+      <rect x="2" y="2" width="17" height="17" rx="4" fill="var(--paper)" stroke="currentColor" strokeWidth="2" />
+      {(PIPS[face] ?? PIPS[5]).map(([x, y], i) => (
+        <circle key={i} cx={x - 1.2} cy={y - 1.2} r="1.5" fill="var(--red)" stroke="currentColor" strokeWidth="1.2" />
+      ))}
+    </svg>
+  );
+}
+
 /* One hand-drawn icon per genre, all in the same chunky stroke style. */
 const GENRE_ICONS: Record<GenreKey, React.ReactNode> = {
   rock: <path d="M13 2 4 14h7l-1 8 9-12h-7z" />,
@@ -922,11 +943,14 @@ function SearchSection() {
   const [limit, setLimit] = useState(20);
   const [res, setRes] = useState<{ total: number; hits: SearchHit[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rolling, setRolling] = useState(false);
+  const [face, setFace] = useState(5);
+  const [rolled, setRolled] = useState<SearchHit | null | "none">(null);
 
   const term = q.trim();
   const active = term.length >= 2 || picked.length > 0;
 
-  useEffect(() => { setLimit(20); }, [term, picked]);
+  useEffect(() => { setLimit(20); setRolled(null); }, [term, picked]);
 
   useEffect(() => {
     if (!active) { setRes(null); setBusy(false); return; }
@@ -943,12 +967,42 @@ function SearchSection() {
     return () => { alive = false; clearTimeout(t); };
   }, [term, picked, limit, active]);
 
+  /* Roll the die: spin for a second, then serve one random song (within the
+     picked genres, if any). It only shows the card — a phone won't let sound
+     start after a network wait, so the listener taps play. */
+  async function roll() {
+    if (rolling) return;
+    setRolling(true);
+    setRolled(null);
+    const spin = setInterval(() => setFace(1 + Math.floor(Math.random() * 6)), 110);
+    const params = new URLSearchParams({ random: "1" });
+    if (picked.length) params.set("g", picked.join(","));
+    const [d] = await Promise.all([
+      fetch(`/api/search?${params}`).then(r => r.json()).catch(() => null),
+      new Promise(r => setTimeout(r, 1000)),
+    ]);
+    clearInterval(spin);
+    setFace(1 + Math.floor(Math.random() * 6));
+    setRolled(d?.hits?.[0] ?? "none");
+    setRolling(false);
+  }
+
   const toggleGenre = (k: GenreKey) => setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k]));
 
   return (
     <section id="search" className="rounded-xl px-5 md:px-12 py-10 md:py-12" style={{ background: "var(--yellow)" }}>
       <div className="max-w-5xl mx-auto flex flex-col items-center">
-        <h2 className="display text-3xl md:text-5xl mb-5 text-center">Find a song</h2>
+        <div className="flex items-center justify-center gap-4 mb-5">
+          <h2 className="display text-3xl md:text-5xl text-center">Find a song</h2>
+          <button
+            className={`dice-btn${rolling ? " is-rolling" : ""}`}
+            onClick={roll}
+            aria-label="Surprise me: pick a random song"
+            title="Surprise me"
+          >
+            <DiceIcon face={face} />
+          </button>
+        </div>
         <div className="search-box">
           <span className="search-box__icon"><SearchIcon /></span>
           <input
@@ -984,7 +1038,26 @@ function SearchSection() {
             );
           })}
         </div>
-        {res && (
+        {rolled && (
+          <div className="flex flex-col items-center gap-3 w-full mt-6">
+            {rolled === "none" ? (
+              <p className="font-semibold text-center">Nothing came up. Roll again?</p>
+            ) : (
+              <>
+                <p className="menu-type text-sm opacity-70">Random track</p>
+                <PlaylistMiniPlayer
+                  key={`roll-${rolled.id}`}
+                  playlistId={rolled.source.key.startsWith("fresh-") ? rolled.source.key : `s-${rolled.id}`}
+                  coverUrl={rolled.image_url}
+                  name={rolled.source.key.startsWith("fresh-") ? "Fresh" : "Random"}
+                  initialTracks={[rolled]}
+                  compact
+                />
+              </>
+            )}
+          </div>
+        )}
+        {res && !rolled && (
           <div className="flex flex-col items-center gap-3 md:gap-4 w-full mt-6">
             {res.hits.length === 0 ? (
               <p className="font-semibold text-center">

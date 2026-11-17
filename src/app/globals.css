@@ -1546,3 +1546,25 @@ body {
 .pager__btn:active:not(:disabled), .pager__btn.is-on { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ink); }
 .pager__btn.is-on { background: var(--ink); color: var(--paper); }
 .pager__btn:disabled { opacity: 0.35; cursor: default; box-shadow: 0 1px 0 0 var(--ink); transform: translateY(2px); }
+
+/* Surprise-me die next to "Find a song" */
+.dice-btn {
+  -webkit-appearance: none; appearance: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 3.4rem; height: 3.4rem; flex-shrink: 0;
+  color: var(--ink); background: var(--paper);
+  border: 2px solid var(--ink); border-radius: 1rem;
+  box-shadow: 0 4px 0 0 var(--ink);
+  cursor: pointer; transition: transform 0.08s, box-shadow 0.08s;
+}
+.dice-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 0 var(--ink); }
+.dice-btn.is-rolling { animation: dice-hop 0.5s ease-in-out infinite; }
+.dice-btn.is-rolling svg { animation: dice-tumble 0.5s linear infinite; }
+@keyframes dice-tumble { to { transform: rotate(360deg); } }
+@keyframes dice-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dice-btn.is-rolling, .dice-btn.is-rolling svg { animation: none; }
+}
