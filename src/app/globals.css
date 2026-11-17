@@ -1528,3 +1528,21 @@ body {
 
 /* clip box for scrolling text (see Marquee) */
 .marquee-box { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
+
+/* Page buttons (Fresh) */
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.45rem; margin-top: 0.75rem; }
+.pager__item { display: inline-flex; align-items: center; gap: 0.45rem; }
+.pager__gap { font-family: var(--font-menu); opacity: 0.5; }
+.pager__btn {
+  -webkit-appearance: none; appearance: none;
+  min-width: 2.5rem; height: 2.5rem; padding: 0 0.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-menu); font-size: 1rem; font-weight: 700;
+  color: var(--ink); background: var(--cream-deep);
+  border: 2px solid var(--ink); border-radius: 999px;
+  box-shadow: 0 3px 0 0 var(--ink);
+  cursor: pointer; transition: transform 0.08s, box-shadow 0.08s;
+}
+.pager__btn:active:not(:disabled), .pager__btn.is-on { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ink); }
+.pager__btn.is-on { background: var(--ink); color: var(--paper); }
+.pager__btn:disabled { opacity: 0.35; cursor: default; box-shadow: 0 1px 0 0 var(--ink); transform: translateY(2px); }

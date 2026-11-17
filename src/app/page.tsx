@@ -855,6 +855,37 @@ type PlayerApi = {
 };
 const PlayerCtx = createContext<PlayerApi | null>(null);
 
+const FRESH_PAGE = 5;
+
+/* Round page buttons with chevrons, same chunky style as the rest. */
+function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
+  if (pages < 2) return null;
+  // 1 … 4 5 6 … 9 — always first, last and the neighbours of the current page
+  const show = Array.from({ length: pages }, (_, i) => i).filter(i => i === 0 || i === pages - 1 || Math.abs(i - page) <= 1);
+  const chev = (dir: 1 | -1) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={dir === -1 ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
+    </svg>
+  );
+  return (
+    <nav className="pager" aria-label="Pages">
+      <button className="pager__btn" onClick={() => onPage(page - 1)} disabled={page === 0} aria-label="Previous page">{chev(-1)}</button>
+      {show.map((i, k) => (
+        <span key={i} className="pager__item">
+          {k > 0 && i - show[k - 1] > 1 && <span className="pager__gap" aria-hidden>…</span>}
+          <button
+            className={`pager__btn${i === page ? " is-on" : ""}`}
+            onClick={() => onPage(i)}
+            aria-label={`Page ${i + 1}`}
+            aria-current={i === page ? "page" : undefined}
+          >{i + 1}</button>
+        </span>
+      ))}
+      <button className="pager__btn" onClick={() => onPage(page + 1)} disabled={page === pages - 1} aria-label="Next page">{chev(1)}</button>
+    </nav>
+  );
+}
+
 function SearchIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -1171,6 +1202,7 @@ export default function Home() {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [freshTracks, setFreshTracks] = useState<RawTrack[]>([]);
+  const [freshPage, setFreshPage] = useState(0);
   const [tipOpen, setTipOpen] = useState(false);
   const [streamUrl, setStreamUrl] = useState("");
 
@@ -1334,10 +1366,21 @@ export default function Home() {
       .then(r => r.json())
       .then(d => setPlaylists(Array.isArray(d) ? d : []))
       .catch(() => {});
+    // Newest first: today's list (last added on top), then earlier days.
     fetch("/api/fresh")
       .then(r => r.json())
-      .then(d => {
-        if (d.tracks && Array.isArray(d.tracks)) setFreshTracks(d.tracks);
+      .then(async (d: { tracks?: RawTrack[]; dates?: string[]; date?: string }) => {
+        if (!Array.isArray(d.tracks)) return;
+        const seen = new Set<string>();
+        const merge = (lists: RawTrack[][]) =>
+          lists.flatMap(l => [...l].reverse()).filter(t => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+        setFreshTracks(merge([d.tracks]));
+        const older = (d.dates ?? []).filter(x => d.date && x < d.date).slice(0, 12);
+        if (!older.length) return;
+        const rest = await Promise.all(
+          older.map(x => fetch(`/api/fresh?date=${x}`).then(r => r.json()).then(a => (Array.isArray(a) ? a : [])).catch(() => []))
+        );
+        setFreshTracks(merge([d.tracks, ...rest]));
       })
       .catch(() => {});
     fetch("/api/config")
@@ -2175,7 +2218,7 @@ export default function Home() {
           </p>
           {freshTracks.length > 0 ? (
             <div className="flex flex-col items-center gap-3 md:gap-4">
-              {freshTracks.map((t) => (
+              {freshTracks.slice(freshPage * FRESH_PAGE, (freshPage + 1) * FRESH_PAGE).map((t) => (
                 <PlaylistMiniPlayer
                   key={t.id}
                   playlistId={`fresh-${t.id}`}
@@ -2185,6 +2228,14 @@ export default function Home() {
                   compact
                 />
               ))}
+              <Pager
+                page={freshPage}
+                pages={Math.ceil(freshTracks.length / FRESH_PAGE)}
+                onPage={p => {
+                  setFreshPage(p);
+                  document.getElementById("fresh")?.scrollIntoView({ block: "start", behavior: "smooth" });
+                }}
+              />
             </div>
           ) : (
             <p className="font-medium opacity-40">Nothing fresh today — check back later.</p>
