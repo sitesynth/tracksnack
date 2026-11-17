@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 type Track = {
   id: string;
@@ -12,6 +12,8 @@ type Track = {
   genre: string;
   sunoUrl: string;
   likes: number;
+  orderedFor?: string;
+  description?: string;
 };
 
 type RawTrack = {
@@ -116,6 +118,8 @@ function mapTracks(raw: RawTrack[]): Track[] {
     genre: "",
     sunoUrl: `https://suno.com/song/${t.id}`,
     likes: 0,
+    orderedFor: t.ordered_for,
+    description: t.description,
   }));
 }
 
@@ -690,13 +694,38 @@ function useCroppedCover(url?: string): string | undefined {
   return cover;
 }
 
+function ShareIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 15V3" />
+      <path d="M7.5 7.5 12 3l4.5 4.5" />
+      <path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
+    </svg>
+  );
+}
+
+/* The one shared player. Home owns the only <audio> pair; every card on the
+   page (Fresh, Today's specials) just asks it to play a list. */
+type PlayerApi = {
+  sourceKey: string;
+  playing: boolean;
+  currId: string | undefined;
+  playList: (key: string, name: string, raw: RawTrack[], start?: number) => void;
+  toggle: () => void;
+  skip: (dir: 1 | -1) => void;
+  likedIds: Set<string>;
+  likeCounts: Record<string, number>;
+  toggleLike: (id: string) => void;
+  openPlayer: () => void;
+};
+const PlayerCtx = createContext<PlayerApi | null>(null);
+
 function PlaylistMiniPlayer({
   playlistId,
   coverUrl,
   name,
   description,
   accent,
-  onBeforePlay,
   initialTracks,
   compact,
 }: {
@@ -705,248 +734,44 @@ function PlaylistMiniPlayer({
   name: string;
   description?: string;
   accent?: string;
-  onBeforePlay: (audio: HTMLAudioElement) => void;
   /** Pre-loaded tracks (skips the custom-playlist fetch) — used by Fresh. */
   initialTracks?: RawTrack[];
-  /** Collapsed state as a single compact row instead of the playlist card. */
+  /** Single compact row instead of the playlist card. */
   compact?: boolean;
 }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const api = useContext(PlayerCtx)!;
   const [tracks, setTracks] = useState<RawTrack[]>(initialTracks ?? []);
-  const [idx, setIdx] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(!initialTracks);
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
-  const [expanded, setExpanded] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [elapsed, setElapsed] = useState("");
-  const [remaining, setRemaining] = useState("");
-  const [playMode, setPlayMode] = useState<"seq" | "loop" | "random">("seq");
-  const shouldPlayRef = useRef(false);
-  const tracksLenRef = useRef(0);
-  const tracksRef = useRef<RawTrack[]>(initialTracks ?? []);
-  const idxRef = useRef(0);
-  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
-  useEffect(() => { idxRef.current = idx; }, [idx]);
-  const playModeRef = useRef(playMode);
-  useEffect(() => { playModeRef.current = playMode; }, [playMode]);
 
   useEffect(() => {
-    if (initialTracks) {
-      tracksLenRef.current = initialTracks.length;
-    } else {
-      fetch(`/api/custom-playlists/${playlistId}/tracks`)
-        .then(r => r.json())
-        .then(d => {
-          const arr = Array.isArray(d) ? d : [];
-          setTracks(arr);
-          tracksLenRef.current = arr.length;
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }
-    fetch("/api/likes").then(r => r.json()).then(setLikeCounts).catch(() => {});
-    try {
-      const raw = localStorage.getItem("ts-liked-ids");
-      if (raw) setLikedIds(new Set(JSON.parse(raw)));
-    } catch {}
-  }, [playlistId]);
-
-  function toggleLike(trackId: string) {
-    const wasLiked = likedIds.has(trackId);
-    const delta = wasLiked ? -1 : 1;
-    setLikeCounts(prev => ({ ...prev, [trackId]: Math.max(0, (prev[trackId] ?? 0) + delta) }));
-    setLikedIds(prev => {
-      const next = new Set(prev);
-      wasLiked ? next.delete(trackId) : next.add(trackId);
-      try { localStorage.setItem("ts-liked-ids", JSON.stringify([...next])); } catch {}
-      return next;
-    });
-    fetch("/api/like", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId, delta }),
-    }).catch(() => {});
-  }
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onEnded = () => {
-      const list = tracksRef.current;
-      const len = Math.max(1, list.length);
-      const cur = idxRef.current;
-      if (playModeRef.current === "loop") {
-        a.currentTime = 0;
-        a.play().catch(() => {});
-        return;
-      }
-      const next = playModeRef.current === "random"
-        ? (len < 2 ? cur : (cur + 1 + Math.floor(Math.random() * (len - 1))) % len)
-        : (cur + 1) % len;
-      if (next !== cur && list[next]) {
-        // Start the next track right here, inside the ended event. Waiting
-        // for React to re-render and run an effect lets a locked phone
-        // suspend the page between tracks, which silently stops the music.
-        a.src = list[next].audio_url;
-        a.play().catch(() => {});
-      }
-      setIdx(next);
-    };
-    // A dead source never fires `ended`, so the player would sit "playing"
-    // in silence. Skip to the next track — but give up once every track in
-    // a row has failed so a fully broken list can't spin forever.
-    let errStreak = 0;
-    const onPlaying = () => { errStreak = 0; };
-    const onError = () => {
-      if (!shouldPlayRef.current || !a.getAttribute("src")) return;
-      if (++errStreak >= tracksRef.current.length) {
-        shouldPlayRef.current = false;
-        return;
-      }
-      onEnded();
-    };
-    a.addEventListener("play", onPlay);
-    a.addEventListener("pause", onPause);
-    a.addEventListener("ended", onEnded);
-    a.addEventListener("playing", onPlaying);
-    a.addEventListener("error", onError);
-    return () => {
-      a.removeEventListener("play", onPlay);
-      a.removeEventListener("pause", onPause);
-      a.removeEventListener("ended", onEnded);
-      a.removeEventListener("playing", onPlaying);
-      a.removeEventListener("error", onError);
-    };
-  }, []);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a || !tracks.length) return;
-    const src = tracks[idx]?.audio_url ?? "";
-    if (a.getAttribute("src") !== src) a.src = src;
-    if (shouldPlayRef.current) a.play().catch(() => {});
-  }, [idx, tracks]);
-
-  useEffect(() => {
-    if (!playing || !("mediaSession" in navigator)) return;
-    const track = tracks[idx];
-    if (!track) return;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title,
-      artist: name,
-      // No `sizes`/`type`: cover art comes from Suno at whatever aspect
-      // ratio it was rendered at (not the square shape the field name
-      // implies) — a declared size that doesn't match the real image is
-      // why iOS silently drops the artwork instead of just scaling it.
-      artwork: track.image_url ? [{ src: track.image_url }] : [],
-    });
-    navigator.mediaSession.playbackState = "playing";
-    // This mini-player owns its own <audio> element, separate from the
-    // main radio player's. Without claiming the handlers here too, the
-    // lock screen's play/pause keeps acting on the main player — which
-    // isn't the thing actually making sound — so playback looks stuck.
-    navigator.mediaSession.setActionHandler("play", () => { audioRef.current?.play().catch(() => {}); setPlaying(true); });
-    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current?.pause(); setPlaying(false); });
-    navigator.mediaSession.setActionHandler("previoustrack", () => skip(-1));
-    navigator.mediaSession.setActionHandler("nexttrack", () => skip(1));
-  }, [playing, idx, tracks, name]);
-
-  useEffect(() => {
-    if (!("mediaSession" in navigator) || playing) return;
-    navigator.mediaSession.playbackState = "paused";
-  }, [playing]);
-
-  // Returning from the lock screen / another app while this mini-player is
-  // playing: open its full-screen view instead of landing on the page.
-  useEffect(() => {
-    const onVisible = () => {
-      if (
-        document.visibilityState === "visible" &&
-        window.matchMedia("(max-width: 767px)").matches &&
-        audioRef.current &&
-        !audioRef.current.paused
-      ) {
-        setExpanded(true);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    setIsDesktop(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    const fmt = (s: number) =>
-      `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-    const onTime = () => {
-      if (isNaN(a.duration) || a.duration <= 0) return;
-      setProgress(a.currentTime / a.duration);
-      setElapsed(fmt(a.currentTime));
-      setRemaining(fmt(Math.max(0, a.duration - a.currentTime)));
-    };
-    a.addEventListener("timeupdate", onTime);
-    a.addEventListener("loadedmetadata", onTime);
-    return () => {
-      a.removeEventListener("timeupdate", onTime);
-      a.removeEventListener("loadedmetadata", onTime);
-    };
-  }, [tracks.length > 0]);
-
-  function seekTo(pct: number) {
-    const a = audioRef.current;
-    if (!a || !isFinite(a.duration) || a.duration <= 0) return;
-    a.currentTime = pct * a.duration;
-  }
-
-  function toggle() {
-    const a = audioRef.current;
-    if (!a || !tracks.length) return;
-    if (playing) {
-      shouldPlayRef.current = false;
-      a.pause();
-    } else {
-      onBeforePlay(a);
-      shouldPlayRef.current = true;
-      a.play().catch(() => {});
-    }
-  }
-
-  function skip(dir: 1 | -1) {
-    const n = tracks.length;
-    if (n < 2) return;
-    shouldPlayRef.current = playing;
-    setIdx(i => (i + dir + n) % n);
-  }
+    if (initialTracks) return;
+    fetch(`/api/custom-playlists/${playlistId}/tracks`)
+      .then(r => r.json())
+      .then(d => setTracks(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [playlistId, initialTracks]);
 
   const n = tracks.length;
+  const isActive = api.sourceKey === playlistId;
+  const idx = isActive ? Math.max(0, tracks.findIndex(t => t.id === api.currId)) : 0;
   const curr = tracks[idx];
-  const nextTrack = n > 1 ? tracks[(idx + 1) % n] : undefined;
+  const playingHere = isActive && api.playing;
   const displayCover = curr?.image_url || coverUrl || "";
   const croppedCover = useCroppedCover(displayCover || undefined);
-  const croppedNext = useCroppedCover(nextTrack?.image_url || undefined);
   const currMeta = useTrackMeta(curr?.id);
-  const nextMeta = useTrackMeta(nextTrack?.id);
   const genre = currMeta ? genreLabel(currMeta.tags) : "";
+
+  const onPlay = () => (isActive ? api.toggle() : api.playList(playlistId, name, tracks, 0));
+  const liked = curr ? api.likedIds.has(curr.id) : false;
+  const likeCount = curr ? (api.likeCounts[curr.id] ?? 0) : 0;
 
   const compactCard = curr && (
     <div className="panel flex flex-wrap items-center gap-x-3 gap-y-3 md:gap-4 !p-4 w-full max-w-xl">
       <div className="flex items-center gap-3 min-w-0 flex-1 basis-full md:basis-0">
         <button
-          onClick={() => setExpanded(true)}
-          aria-label="Expand player"
+          onClick={() => (isActive ? api.openPlayer() : onPlay())}
+          aria-label={isActive ? "Open player" : `Play ${curr.title}`}
           className="w-16 h-16 rounded-xl border-2 shrink-0 overflow-hidden"
           style={{ borderColor: "var(--ink)", padding: 0, background: "none", cursor: "pointer", border: "2px solid var(--ink)" }}
         >
@@ -960,24 +785,26 @@ function PlaylistMiniPlayer({
       </div>
       <div className="flex items-center justify-between gap-3 w-full md:w-auto">
         <button
-          className={`player__like player__like--lg shrink-0 flex-1 md:flex-none${likedIds.has(curr.id) ? " is-liked" : ""}`}
-          onClick={() => toggleLike(curr.id)}
-          aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+          className={`player__like player__like--lg shrink-0 flex-1 md:flex-none${liked ? " is-liked" : ""}`}
+          onClick={() => api.toggleLike(curr.id)}
+          aria-label={liked ? "Unlike" : "Like"}
         >
-          {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+          {liked ? "♥" : "♡"} {likeCount}
         </button>
         <button
-          aria-label={playing ? "Pause" : `Play ${curr.title}`}
-          onClick={toggle}
+          aria-label={playingHere ? "Pause" : `Play ${curr.title}`}
+          onClick={onPlay}
           className="player__play shrink-0"
         >
-          {playing ? "❚❚" : "▶"}
+          {playingHere ? "❚❚" : "▶"}
         </button>
       </div>
     </div>
   );
 
-  const miniCard = compact && compactCard ? compactCard : (
+  if (compact && compactCard) return compactCard;
+
+  return (
     <div className="playlist-mini">
       <div
         className="playlist-mini__band"
@@ -991,7 +818,11 @@ function PlaylistMiniPlayer({
         <div className="playlist-mini__top">
           {displayCover
             ? (
-              <button className="playlist-mini__expand" onClick={() => setExpanded(true)} aria-label="Expand player">
+              <button
+                className="playlist-mini__expand"
+                onClick={() => (isActive ? api.openPlayer() : onPlay())}
+                aria-label={isActive ? "Open player" : "Play"}
+              >
                 <img src={croppedCover || displayCover} alt={name} className="playlist-mini__thumb" />
               </button>
             )
@@ -1001,170 +832,29 @@ function PlaylistMiniPlayer({
             <p className="playlist-mini__label">Now serving</p>
             <p className="playlist-mini__track">
               {loading ? "…" : curr?.title || "—"}
-              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
+              {playingHere && <span className="now-shelf__dot ml-2 inline-block" />}
             </p>
           </div>
         </div>
         <div className="playlist-mini__controls">
-          <button className="player__nav" onClick={() => skip(-1)} disabled={n < 2} aria-label="Previous">‹</button>
-          <button className="player__play" onClick={toggle} disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
-          <button className="player__nav" onClick={() => skip(1)} disabled={n < 2} aria-label="Next">›</button>
+          <button className="player__nav" onClick={() => api.skip(-1)} disabled={!isActive || n < 2} aria-label="Previous">‹</button>
+          <button className="player__play" onClick={onPlay} disabled={n === 0 || loading} aria-label={playingHere ? "Pause" : "Play"}>{playingHere ? "❚❚" : "▶"}</button>
+          <button className="player__nav" onClick={() => api.skip(1)} disabled={!isActive || n < 2} aria-label="Next">›</button>
           {!loading && n > 0 && (
             <span className="playlist-mini__count">{idx + 1}/{n}</span>
           )}
           {curr && (
             <button
-              className={`playlist-mini__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-              onClick={() => toggleLike(curr.id)}
-              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+              className={`playlist-mini__like${liked ? " is-liked" : ""}`}
+              onClick={() => api.toggleLike(curr.id)}
+              aria-label={liked ? "Unlike" : "Like"}
             >
-              {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+              {liked ? "♥" : "♡"} {likeCount}
             </button>
           )}
         </div>
       </div>
     </div>
-  );
-
-  return (
-    <>
-      <audio ref={audioRef} preload="none" />
-
-      {/* Mobile fullscreen player */}
-      {expanded && !isDesktop && curr && (
-        <div className="player-fs" style={{ display: "flex" }}>
-          <div className="player-fs__topbar">
-            <span className="player-fs__playlist-name">{name}</span>
-            <button
-              className="player-fs__close"
-              onClick={() => setExpanded(false)}
-              aria-label="Collapse player"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className="player-fs__artwork">
-            {displayCover && <img src={croppedCover || displayCover} alt={curr.title} className="player-fs__img" />}
-          </div>
-          <div className="player-fs__body">
-            <p className="player-fs__song">
-              {curr.title}
-              {playing && <span className="now-shelf__dot ml-2 inline-block" />}
-            </p>
-            <p className="player-fs__author" style={{ color: "var(--ink)", textDecoration: "none", opacity: 0.55 }}>
-              {curr.ordered_for ? `${name} — for ${curr.ordered_for}` : name}
-            </p>
-            {(genre || currMeta) && (
-              <div className="player-card__meta">
-                {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
-                {currMeta && <ArtistChip meta={currMeta} />}
-              </div>
-            )}
-            {curr.description && <p className="player-desc">{curr.description}</p>}
-            <div className="player__controls" style={{ justifyContent: "center" }}>
-              <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
-              <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
-              <button onClick={() => skip(1)} className="player__nav" disabled={n < 2} aria-label="Next">›</button>
-              <button
-                className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-                onClick={() => toggleLike(curr.id)}
-                aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-              >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
-            </div>
-            <Scrubber progress={progress} seekTo={seekTo} />
-            <div className="player__scrubber-time">
-              <span>{elapsed || "0:00"}</span>
-              <span>{remaining || fmtDuration(curr.duration)}</span>
-            </div>
-            {nextTrack && (
-              <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
-                <span className="player-card__next-label menu-type">next up</span>
-                {nextTrack.image_url && <img src={croppedNext || nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
-                <span className="player-card__next-title">
-                  <span className="player__song-text">{nextTrack.title}</span>
-                  {nextMeta?.artist && <span className="player-card__next-author">{nextMeta.artist}</span>}
-                </span>
-                <span className="font-black opacity-40">›</span>
-              </button>
-            )}
-            <TrackComments trackId={curr.id} />
-          </div>
-        </div>
-      )}
-
-      {/* Desktop: expanded = player-card inline; collapsed = mini card */}
-      {expanded && isDesktop && curr ? (
-        <div
-          className="player-card"
-          style={{ maxWidth: "30rem", margin: "0 auto", ...(compact ? { width: "100%" } : {}) }}
-        >
-          <button
-            className="player-card__close"
-            onClick={() => setExpanded(false)}
-            aria-label="Collapse player"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-              <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
-          </button>
-          <p style={{ fontFamily: "var(--font-menu)", fontSize: "0.78rem", letterSpacing: "0.07em", textTransform: "uppercase", opacity: 0.6, alignSelf: "flex-start" }}>
-            {curr.ordered_for ? `${name} — for ${curr.ordered_for}` : name}
-          </p>
-          <div className="player-card__cover">
-            <img src={croppedCover || displayCover} alt={curr.title} />
-          </div>
-          <p className="player-card__song">
-            {curr.title}
-            {playing && <span className="now-shelf__dot ml-2 inline-block" />}
-          </p>
-          <div className="player-card__meta">
-            {genre && <span className="chip" style={{ background: "var(--yellow)" }}>{genre}</span>}
-            {currMeta && <ArtistChip meta={currMeta} />}
-          </div>
-          {curr.description && <p className="player-desc">{curr.description}</p>}
-          <div className="player__controls" style={{ justifyContent: "center" }}>
-            <button onClick={() => skip(-1)} className="player__nav" disabled={n < 2} aria-label="Previous">‹</button>
-            <button onClick={toggle} className="player__play" disabled={n === 0 || loading} aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
-            <button onClick={() => skip(1)} className="player__nav" disabled={n < 2} aria-label="Next">›</button>
-            <button
-              className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
-              onClick={() => toggleLike(curr.id)}
-              aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-            >{likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}</button>
-          </div>
-          <Scrubber progress={progress} seekTo={seekTo} />
-          <div className="player__scrubber-time">
-            <span>{elapsed || "0:00"}</span>
-            <span>{remaining || fmtDuration(curr.duration)}</span>
-          </div>
-          <div className="player__modes">
-            {(["seq", "loop", "random"] as const).map(m => (
-              <button key={m} onClick={() => setPlayMode(m)} className={`player__mode${playMode === m ? " active" : ""}`} title={m === "seq" ? "Play all" : m === "loop" ? "Loop track" : "Shuffle"}>
-                {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
-              </button>
-            ))}
-          </div>
-          {nextTrack && (
-            <button className="player-card__next" style={{ width: "100%" }} onClick={() => skip(1)}>
-              <span className="player-card__next-label menu-type">next up</span>
-              {nextTrack.image_url && <img src={croppedNext || nextTrack.image_url} alt={nextTrack.title} className="player-card__next-img" />}
-              <span className="player-card__next-title">
-                <span className="player__song-text">{nextTrack.title}</span>
-                {nextMeta?.artist && <span className="player-card__next-author">{nextMeta.artist}</span>}
-              </span>
-              <span className="font-black opacity-40">›</span>
-            </button>
-          )}
-          <TrackComments trackId={curr.id} />
-        </div>
-      ) : (
-        miniCard
-      )}
-    </>
   );
 }
 
@@ -1192,7 +882,6 @@ export default function Home() {
     () => (activeIsARef.current ? crossfadeRef.current : audioRef.current),
     []
   );
-  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const primedRef = useRef(false);
   const songTitleRef = useRef<HTMLSpanElement>(null);
   const nextTitleRef = useRef<HTMLSpanElement>(null);
@@ -1201,7 +890,16 @@ export default function Home() {
   const [expanded, setExpanded] = useState(false);
   const [playMode, setPlayMode] = useState<"seq" | "loop" | "random">("seq");
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [liked, setLiked] = useState<boolean[]>([]);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  /* Which list the shared player is playing: the station ("radio", with the
+     broadcast grid) or a list started from a card (Fresh, a playlist). */
+  const RADIO = { key: "radio", name: "Radio" };
+  const [source, setSource] = useState(RADIO);
+  const sourceRef = useRef(RADIO);
+  const radioTracksRef = useRef<Track[]>([]);
+  const [started, setStarted] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(true);
+  const heroPlayerRef = useRef<HTMLDivElement>(null);
   const [remaining, setRemaining] = useState<string>("");
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -1257,6 +955,7 @@ export default function Home() {
     if (!from || !to) { onComplete(); return; }
     const fromEl: HTMLAudioElement = from;
     const toEl: HTMLAudioElement = to;
+    cancelSeek();
     crossfadingRef.current = true;
     const startVol = fromEl.volume || 1;
     toEl.src = nextSrc;
@@ -1311,37 +1010,34 @@ export default function Home() {
     }
   };
 
+  /* A seek requested before the metadata arrived waits on the element. When
+     the source changes (card tapped, back to radio, manual skip) that stale
+     seek must go, or it fires on the new track's metadata. */
+  const pendingSeekCancelRef = useRef<(() => void) | null>(null);
+  function cancelSeek() {
+    pendingSeekCancelRef.current?.();
+    pendingSeekCancelRef.current = null;
+  }
+
   function applySeek(a: HTMLAudioElement, offset: number) {
+    cancelSeek();
     if (a.readyState >= 1) {
       a.currentTime = offset;
     } else {
       const onMeta = () => {
         a.currentTime = Math.min(offset, Math.max(0, (a.duration || offset + 1) - 1));
-        a.removeEventListener("loadedmetadata", onMeta);
+        cancelSeek();
       };
       a.addEventListener("loadedmetadata", onMeta);
+      pendingSeekCancelRef.current = () => a.removeEventListener("loadedmetadata", onMeta);
     }
-  }
-
-  // Pause any active mini-player before the main player starts
-  function handleBeforePlay(newAudio: HTMLAudioElement) {
-    const mainAudio = active();
-    if (mainAudio && !mainAudio.paused) {
-      mainAudio.pause();
-      mainAudio.volume = 1;
-      setPlaying(false);
-    }
-    if (activeAudioRef.current && activeAudioRef.current !== newAudio && !activeAudioRef.current.paused) {
-      activeAudioRef.current.pause();
-    }
-    activeAudioRef.current = newAudio;
   }
 
   useEffect(() => {
     async function loadTracks() {
       const applyList = (list: Track[]) => {
+        radioTracksRef.current = list;
         setTracks(list);
-        setLiked(list.map(() => false));
         if (list.length > 1) {
           const pos = broadcastPosition(list);
           pendingSeekRef.current = pos.offset;
@@ -1363,6 +1059,10 @@ export default function Home() {
       .then(r => r.json())
       .then(setLikeCounts)
       .catch(() => {});
+    try {
+      const raw = localStorage.getItem("ts-liked-ids");
+      if (raw) setLikedIds(new Set(JSON.parse(raw)));
+    } catch {}
     fetch("/api/custom-playlists")
       .then(r => r.json())
       .then(d => setPlaylists(Array.isArray(d) ? d : []))
@@ -1386,6 +1086,7 @@ export default function Home() {
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
     } else {
+      cancelSeek();
       a.src = track?.audioUrl ?? "";
       const seek = pendingSeekRef.current;
       if (seek !== null) {
@@ -1400,7 +1101,9 @@ export default function Home() {
     if ("mediaSession" in navigator && track) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
-        artist: AUTHOR,
+        artist: sourceRef.current.key === "radio"
+          ? AUTHOR
+          : `${sourceRef.current.name}${track.orderedFor ? ` — for ${track.orderedFor}` : ""}`,
         // No `sizes`: cover art isn't actually square, and a declared size
         // that doesn't match the real image makes iOS drop the artwork
         // instead of just scaling it.
@@ -1419,8 +1122,8 @@ export default function Home() {
     const n = tracks.length;
     navigator.mediaSession.setActionHandler("play", () => { active()?.play().catch(() => {}); setPlaying(true); });
     navigator.mediaSession.setActionHandler("pause", () => { active()?.pause(); setPlaying(false); });
-    navigator.mediaSession.setActionHandler("previoustrack", () => selectTrack(i => (i - 1 + n) % n));
-    navigator.mediaSession.setActionHandler("nexttrack", () => selectTrack(i => (i + 1) % n));
+    navigator.mediaSession.setActionHandler("previoustrack", n > 1 ? () => selectTrack(i => (i - 1 + n) % n) : null);
+    navigator.mediaSession.setActionHandler("nexttrack", n > 1 ? () => selectTrack(i => (i + 1) % n) : null);
     return () => {
       (["play","pause","previoustrack","nexttrack"] as MediaSessionAction[]).forEach(a => {
         navigator.mediaSession.setActionHandler(a, null);
@@ -1503,7 +1206,15 @@ export default function Home() {
       const n = tracks.length || 1;
       const mode = playModeRef.current;
       if (mode === "loop") return;
-      const nextIdx = mode === "random" ? Math.floor(Math.random() * n) : (trackIdxRef.current + 1) % n;
+      const isRadio = sourceRef.current.key === "radio";
+      let nextIdx = mode === "random" ? Math.floor(Math.random() * n) : trackIdxRef.current + 1;
+      // A list started from a card ends where it ends; only the station wraps around.
+      if (!isRadio && (n < 2 || (mode !== "random" && nextIdx >= n))) {
+        active()?.pause();
+        setPlaying(false);
+        return;
+      }
+      nextIdx %= n;
       const nextTrack = tracks[nextIdx];
       if (!nextTrack) return;
       const preroll = djPrerollFor(nextTrack);
@@ -1608,17 +1319,18 @@ export default function Home() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  function toggleLike(i: number) {
-    const trackId = tracks[i].id;
-    const delta = liked[i] ? -1 : 1;
+  function toggleLike(trackId: string) {
+    const wasLiked = likedIds.has(trackId);
+    const delta = wasLiked ? -1 : 1;
     setLikeCounts(prev => ({
       ...prev,
       [trackId]: Math.max(0, (prev[trackId] ?? 0) + delta),
     }));
-    setLiked(ls => {
-      const nextLs = ls.map((v, j) => (j === i ? !v : v));
-      try { localStorage.setItem("ts-likes", JSON.stringify(nextLs)); } catch {}
-      return nextLs;
+    setLikedIds(prev => {
+      const next = new Set(prev);
+      if (wasLiked) next.delete(trackId); else next.add(trackId);
+      try { localStorage.setItem("ts-liked-ids", JSON.stringify([...next])); } catch {}
+      return next;
     });
     fetch("/api/like", {
       method: "POST",
@@ -1635,7 +1347,7 @@ export default function Home() {
     if (touchX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchX.current;
     touchX.current = null;
-    if (Math.abs(dx) < 40) return;
+    if (Math.abs(dx) < 40 || tracks.length < 2) return;
     liveSyncRef.current = false;
     setTrackIdx(i => {
       const len = tracks.length || 1;
@@ -1664,12 +1376,10 @@ export default function Home() {
       a.pause();
     } else {
       primeInactiveAudio();
-      if (activeAudioRef.current && !activeAudioRef.current.paused) {
-        activeAudioRef.current.pause();
-      }
+      setStarted(true);
       // Joining the live grid: re-sync to "what's on air right now" — pausing
       // the radio means missing a piece, like a real station.
-      if (liveSyncRef.current && playModeRef.current === "seq" && tracks.length > 1) {
+      if (liveSyncRef.current && sourceRef.current.key === "radio" && playModeRef.current === "seq" && tracks.length > 1) {
         const pos = broadcastPosition(tracks);
         if (pos.idx !== trackIdx) {
           pendingSeekRef.current = pos.offset;
@@ -1683,6 +1393,105 @@ export default function Home() {
       setPlaying(true);
     }
   }
+
+  /* Starts a list from a card. Runs inside the tap so phones allow the sound,
+     and swaps the source on the same <audio> element — no second player. */
+  function playList(key: string, name: string, raw: RawTrack[], start = 0) {
+    const list = mapTracks(raw);
+    const a = active();
+    if (!a || !list.length || crossfadingRef.current) return;
+    primeInactiveAudio();
+    liveSyncRef.current = false;
+    djQueueRef.current = null;
+    pendingSeekRef.current = null;
+    cancelSeek();
+    a.src = list[start].audioUrl;
+    a.volume = 1;
+    a.play().catch(() => {});
+    skipNextLoadRef.current = true;
+    const next = { key, name };
+    sourceRef.current = next;
+    setSource(next);
+    trackIdxRef.current = start;
+    setTracks(list);
+    setTrackIdx(start);
+    setPlaying(true);
+    setStarted(true);
+  }
+
+  function backToRadio() {
+    const list = radioTracksRef.current;
+    const a = active();
+    if (!a || !list.length || crossfadingRef.current) return;
+    const pos = broadcastPosition(list);
+    liveSyncRef.current = true;
+    djQueueRef.current = null;
+    pendingSeekRef.current = null;
+    cancelSeek();
+    a.src = list[pos.idx].audioUrl;
+    a.volume = 1;
+    if (pos.offset > 2) applySeek(a, pos.offset);
+    a.play().catch(() => {});
+    skipNextLoadRef.current = true;
+    sourceRef.current = RADIO;
+    setSource(RADIO);
+    trackIdxRef.current = pos.idx;
+    setTracks(list);
+    setTrackIdx(pos.idx);
+    setPlaying(true);
+  }
+
+  function skip(dir: 1 | -1) {
+    const len = tracks.length;
+    if (len < 2) return;
+    selectTrack(i => (i + dir + len) % len);
+  }
+
+  function openPlayer() {
+    if (window.matchMedia("(max-width: 767px)").matches) setExpanded(true);
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // The floating bar only shows while the big player is scrolled out of view.
+  useEffect(() => {
+    const el = heroPlayerRef.current;
+    if (!el || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(([e]) => setHeroVisible(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tracks.length > 0]);
+
+  /* Share the current song: the phone's share sheet when there is one,
+     otherwise copy the link and flash a checkmark on the button. */
+  const [shared, setShared] = useState(false);
+  async function shareTrack(t: Track) {
+    const data = { title: t.title, text: `${t.title} — on TrackSnack`, url: t.sunoUrl };
+    try {
+      if (navigator.share) { await navigator.share(data); return; }
+    } catch (e) {
+      if ((e as DOMException)?.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard.writeText(t.sunoUrl);
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      window.prompt("Copy the link", t.sunoUrl);
+    }
+  }
+
+  const playerApi: PlayerApi = {
+    sourceKey: source.key,
+    playing,
+    currId: tracks[trackIdx]?.id,
+    playList,
+    toggle,
+    skip,
+    likedIds,
+    likeCounts,
+    toggleLike,
+    openPlayer,
+  };
 
   const currCover = useCroppedCover(tracks[trackIdx]?.imageUrl);
   const nextCover = useCroppedCover(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.imageUrl : undefined);
@@ -1701,12 +1510,21 @@ export default function Home() {
   const prevT = prev!;
   const nextT = next!;
 
+  const barVisible = !!curr && started && !expanded && !heroVisible;
+
   return (
-    <div className="min-h-screen flex flex-col gap-1.5 p-1.5" style={{ background: "var(--ink)" }}>
+    <PlayerCtx.Provider value={playerApi}>
+    <div
+      className="min-h-screen flex flex-col gap-1.5 p-1.5"
+      style={{ background: "var(--ink)", paddingBottom: barVisible ? "calc(5.5rem + env(safe-area-inset-bottom))" : undefined }}
+    >
       {/* ── Mobile full-screen player (position:fixed at root to escape overflow:hidden) ── */}
       {expanded && curr && (
         <div className="player-fs" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="player-fs__topbar">
+            {source.key !== "radio" && (
+              <button className="back-to-radio menu-type" onClick={backToRadio}>↩ Back to radio</button>
+            )}
             <button
               className="player-fs__close"
               onClick={() => setExpanded(false)}
@@ -1731,10 +1549,11 @@ export default function Home() {
               {currMeta && <ArtistChip meta={currMeta} />}
             </div>
             <div className="player__controls" style={{ justifyContent: "center" }}>
-              <button onClick={() => selectTrack((trackIdx - 1 + n) % n)} className="player__nav" aria-label={`Previous: ${prevT.title}`}>‹</button>
+              <button onClick={() => selectTrack((trackIdx - 1 + n) % n)} className="player__nav" disabled={n < 2} aria-label={`Previous: ${prevT.title}`}>‹</button>
               <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="player__play">{playing ? "❚❚" : "▶"}</button>
-              <button onClick={() => selectTrack((trackIdx + 1) % n)} className="player__nav" aria-label={`Next: ${nextT.title}`}>›</button>
-              <button onClick={() => toggleLike(trackIdx)} className={`player__like${liked[trackIdx] ? " is-liked" : ""}`} aria-label={liked[trackIdx] ? "Unlike" : "Like"}>{liked[trackIdx] ? "♥" : "♡"} {likeCount}</button>
+              <button onClick={() => selectTrack((trackIdx + 1) % n)} className="player__nav" disabled={n < 2} aria-label={`Next: ${nextT.title}`}>›</button>
+              <button onClick={() => toggleLike(curr.id)} className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`} aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}>{likedIds.has(curr.id) ? "♥" : "♡"} {likeCount}</button>
+              <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
             </div>
             <Scrubber progress={progress} seekTo={seekTo} />
             <div className="player__scrubber-time">
@@ -1748,6 +1567,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {n > 1 && (
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => selectTrack((trackIdx + 1) % n)}>
               <span className="player-card__next-label menu-type">next up</span>
               <img src={nextCover || nextT.imageUrl} alt={nextT.title} className="player-card__next-img" />
@@ -1757,6 +1577,7 @@ export default function Home() {
               </span>
               <span className="font-black opacity-40">›</span>
             </button>
+            )}
             <TrackComments trackId={curr.id} />
           </div>
         </div>
@@ -1811,6 +1632,12 @@ export default function Home() {
             </div>
 
             {/* Player */}
+            <div ref={heroPlayerRef}>
+            {curr && source.key !== "radio" && (
+              <button className="back-to-radio menu-type" onClick={backToRadio}>
+                ↩ Back to radio <span className="opacity-60">· now: {source.name}</span>
+              </button>
+            )}
             {curr && (!expanded ? (
               <div className="player mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 <button
@@ -1831,6 +1658,7 @@ export default function Home() {
                   <button
                     onClick={() => selectTrack((trackIdx - 1 + n) % n)}
                     className="player__nav"
+                    disabled={n < 2}
                     aria-label={`Previous: ${prevT.title}`}
                   >
                     ‹
@@ -1845,6 +1673,7 @@ export default function Home() {
                   <button
                     onClick={() => selectTrack((trackIdx + 1) % n)}
                     className="player__nav"
+                    disabled={n < 2}
                     aria-label={`Next: ${nextT.title}`}
                   >
                     ›
@@ -1878,6 +1707,7 @@ export default function Home() {
                     <button
                       onClick={() => selectTrack((trackIdx - 1 + n) % n)}
                       className="player__nav"
+                      disabled={n < 2}
                       aria-label={`Previous: ${prevT.title}`}
                     >
                       ‹
@@ -1892,17 +1722,19 @@ export default function Home() {
                     <button
                       onClick={() => selectTrack((trackIdx + 1) % n)}
                       className="player__nav"
+                      disabled={n < 2}
                       aria-label={`Next: ${nextT.title}`}
                     >
                       ›
                     </button>
                     <button
-                      onClick={() => toggleLike(trackIdx)}
-                      className={`player__like${liked[trackIdx] ? " is-liked" : ""}`}
-                      aria-label={liked[trackIdx] ? "Unlike" : "Like"}
+                      onClick={() => toggleLike(curr.id)}
+                      className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+                      aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
                     >
-                      {liked[trackIdx] ? "♥" : "♡"} {likeCount}
+                      {likedIds.has(curr.id) ? "♥" : "♡"} {likeCount}
                     </button>
+                    <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
                   </div>
                   <Scrubber progress={progress} seekTo={seekTo} />
                   <div className="player__scrubber-time">
@@ -1916,6 +1748,7 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
+                  {n > 1 && (
                   <button
                     className="player-card__next"
                     onClick={() => selectTrack((trackIdx + 1) % n)}
@@ -1928,9 +1761,11 @@ export default function Home() {
                     </span>
                     <span className="font-black opacity-40">›</span>
                   </button>
+                  )}
                   <TrackComments trackId={curr.id} />
                 </div>
             ))}
+            </div>
 
             <h1 className="display text-2xl md:text-3xl mb-2" style={{ color: "var(--brown)" }}>
               Fresh Songs, Cooked Live.
@@ -1987,7 +1822,6 @@ export default function Home() {
                   name={pl.name}
                   description={pl.description}
                   accent={pl.accent}
-                  onBeforePlay={handleBeforePlay}
                 />
               ))}
             </div>
@@ -2014,7 +1848,6 @@ export default function Home() {
                   playlistId={`fresh-${t.id}`}
                   coverUrl={t.image_url}
                   name="Fresh"
-                  onBeforePlay={handleBeforePlay}
                   initialTracks={[t]}
                   compact
                 />
@@ -2154,6 +1987,32 @@ export default function Home() {
           TrackSnack ✦ Fresh songs, cooked live ✦ Route 66, the internet
         </p>
       </footer>
+
+      {/* ── Floating player bar: one shared player, always in reach ── */}
+      {barVisible && curr && (
+        <div className="float-bar" role="region" aria-label="Now playing">
+          <button className="float-bar__main" onClick={openPlayer} aria-label="Open player">
+            <img src={currCover || curr.imageUrl} alt="" className="float-bar__cover" />
+            <span className="float-bar__text">
+              <span className="float-bar__title">{curr.title}</span>
+              <span className="float-bar__sub">
+                {source.key === "radio" ? "On air · TrackSnack Radio" : `${source.name}${curr.orderedFor ? ` — for ${curr.orderedFor}` : ""}`}
+              </span>
+            </span>
+          </button>
+          <button
+            className={`player__like float-bar__like${likedIds.has(curr.id) ? " is-liked" : ""}`}
+            onClick={() => toggleLike(curr.id)}
+            aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+          >
+            {likedIds.has(curr.id) ? "♥" : "♡"}
+          </button>
+          <button className="player__play" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? "❚❚" : "▶"}
+          </button>
+        </div>
+      )}
     </div>
+    </PlayerCtx.Provider>
   );
 }
