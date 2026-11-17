@@ -1437,3 +1437,56 @@ body {
   cursor: pointer;
 }
 .player-fs__topbar .back-to-radio { margin: 0 auto 0 0; }
+
+/* ── Neon aura behind the player (Philips-Hue style) ──
+   Colours come from the cover art, fully saturated; a wide bloom plus a thin
+   bright rim drift round the card and breathe while music plays. Off for
+   people who ask for less motion. */
+@property --a1 { syntax: "<color>"; inherits: true; initial-value: #ffd731; }
+@property --a2 { syntax: "<color>"; inherits: true; initial-value: #ff2e63; }
+@property --a3 { syntax: "<color>"; inherits: true; initial-value: #14d4ff; }
+@property --aura-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.aura-wrap { position: relative; width: 100%; max-width: 30rem; }
+.aura-wrap > .player,
+.aura-wrap > .player-card { position: relative; z-index: 1; }
+.aura {
+  position: absolute;
+  inset: -0.9rem -0.8rem;
+  z-index: 0;
+  border-radius: 2.2rem;
+  pointer-events: none;
+  background: conic-gradient(from var(--aura-angle), var(--a1), var(--a2), var(--a3), var(--a1));
+  filter: blur(26px) saturate(1.3);
+  opacity: 0.3;
+  transition: opacity 0.8s ease, --a1 1.4s ease, --a2 1.4s ease, --a3 1.4s ease;
+}
+.aura--rim {
+  inset: -4px;
+  border-radius: 1.5rem;
+  filter: blur(5px) saturate(1.4);
+  opacity: 0.55;
+}
+.aura.is-playing {
+  opacity: 0.85;
+  animation: aura-spin 9s linear infinite, aura-breathe 2s ease-in-out infinite;
+}
+.aura--rim.is-playing { opacity: 1; }
+@keyframes aura-spin { to { --aura-angle: 360deg; } }
+@keyframes aura-breathe {
+  0%, 100% { transform: scale(1); filter: blur(26px) saturate(1.3) brightness(0.95); }
+  50% { transform: scale(1.05); filter: blur(30px) saturate(1.5) brightness(1.15); }
+}
+.aura--rim.is-playing { animation: aura-spin 9s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .aura.is-playing { animation: none; opacity: 0.7; }
+}
+
+/* Comments button sits in the control row next to like/share */
+.player__comments { gap: 0.35rem; }
+.player__comments.is-open { background: var(--yellow); }
+
+/* the aura bleeds below the player: keep the headline and buttons above it */
+.billboard h1,
+.billboard h1 ~ * { position: relative; z-index: 2; }
+.aura-wrap + *, .back-to-radio { position: relative; z-index: 2; }

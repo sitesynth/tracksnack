@@ -586,26 +586,30 @@ function ArtistChip({ meta }: { meta: TrackMeta }) {
 
 type Comment = { id: string; name: string; text: string; created: string };
 
-function TrackComments({ trackId }: { trackId: string }) {
+/* Comments for the track that's playing. The button lives in the player's
+   control row and the thread opens underneath, so the state is shared. */
+function useComments(trackId?: string) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [count, setCount] = useState(0);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const loaded = useRef(false);
 
   useEffect(() => {
-    loaded.current = false;
+    setComments([]);
+    setCount(0);
+    if (!trackId) return;
+    let alive = true;
     fetch(`/api/comments/${trackId}`).then(r => r.json()).then(data => {
-      if (Array.isArray(data)) { setComments(data); setCount(data.length); }
-      loaded.current = true;
+      if (alive && Array.isArray(data)) { setComments(data); setCount(data.length); }
     }).catch(() => {});
+    return () => { alive = false; };
   }, [trackId]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !text.trim() || sending) return;
+    if (!trackId || !name.trim() || !text.trim() || sending) return;
     setSending(true);
     try {
       const res = await fetch(`/api/comments/${trackId}`, {
@@ -623,6 +627,33 @@ function TrackComments({ trackId }: { trackId: string }) {
     setSending(false);
   };
 
+  return { open, setOpen, comments, count, name, setName, text, setText, sending, submit };
+}
+type CommentsState = ReturnType<typeof useComments>;
+
+function CommentIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5z" />
+    </svg>
+  );
+}
+
+function CommentsButton({ c }: { c: CommentsState }) {
+  return (
+    <button
+      onClick={() => c.setOpen(!c.open)}
+      className={`player__like player__comments${c.open ? " is-open" : ""}`}
+      aria-label={c.open ? "Hide comments" : `Comments (${c.count})`}
+      aria-expanded={c.open}
+    >
+      <CommentIcon /> {c.count}
+    </button>
+  );
+}
+
+function CommentsPanel({ c }: { c: CommentsState }) {
+  if (!c.open) return null;
   const ago = (iso: string) => {
     const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
     if (d < 1) return "just now";
@@ -630,52 +661,40 @@ function TrackComments({ trackId }: { trackId: string }) {
     if (d < 1440) return `${Math.floor(d / 60)}h`;
     return `${Math.floor(d / 1440)}d`;
   };
-
   return (
-    <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="chip"
-        style={{ background: "var(--cream-deep)", cursor: "pointer", border: "none", fontFamily: "inherit" }}
-      >
-        💬 {count}
-      </button>
-      {open && (
-        <div className="comments-panel">
-          <form onSubmit={submit} className="comments-form">
-            <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              required
-              className="comments-input"
-            />
-            <div style={{ display: "flex", gap: "0.4rem" }}>
-              <input
-                type="text"
-                placeholder="Say something…"
-                value={text}
-                onChange={e => setText(e.target.value)}
-                required
-                className="comments-input"
-                style={{ flex: 1 }}
-              />
-              <button type="submit" disabled={sending} className="comments-send">
-                {sending ? "…" : "→"}
-              </button>
-            </div>
-          </form>
-          {comments.length === 0 && <p className="comments-empty">No comments yet — be the first!</p>}
-          {comments.map(c => (
-            <div key={c.id} className="comments-item">
-              <span className="comments-name">{c.name}</span>
-              <span className="comments-ago">{ago(c.created)}</span>
-              <p className="comments-text">{c.text}</p>
-            </div>
-          ))}
+    <div className="comments-panel">
+      <form onSubmit={c.submit} className="comments-form">
+        <input
+          type="text"
+          placeholder="Name"
+          value={c.name}
+          onChange={e => c.setName(e.target.value)}
+          required
+          className="comments-input"
+        />
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <input
+            type="text"
+            placeholder="Say something…"
+            value={c.text}
+            onChange={e => c.setText(e.target.value)}
+            required
+            className="comments-input"
+            style={{ flex: 1 }}
+          />
+          <button type="submit" disabled={c.sending} className="comments-send">
+            {c.sending ? "…" : "→"}
+          </button>
         </div>
-      )}
+      </form>
+      {c.comments.length === 0 && <p className="comments-empty">No comments yet — be the first!</p>}
+      {c.comments.map(m => (
+        <div key={m.id} className="comments-item">
+          <span className="comments-name">{m.name}</span>
+          <span className="comments-ago">{ago(m.created)}</span>
+          <p className="comments-text">{m.text}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -692,6 +711,77 @@ function useCroppedCover(url?: string): string | undefined {
     return () => { alive = false; };
   }, [url]);
   return cover;
+}
+
+/* Three glow colours pulled from the cover art, like a TV's ambient light:
+   the picture is shrunk to a few pixels and the most colourful hue families
+   win. Falls back to the brand colours if the image can't be read. */
+const AURA_FALLBACK = ["hsl(52 100% 55%)", "hsl(340 100% 58%)", "hsl(190 100% 52%)"];
+const auraCache = new Map<string, string[]>();
+
+function useCoverColors(url?: string): string[] {
+  const [colors, setColors] = useState<string[]>(url ? auraCache.get(url) ?? AURA_FALLBACK : AURA_FALLBACK);
+  useEffect(() => {
+    if (!url) { setColors(AURA_FALLBACK); return; }
+    const hit = auraCache.get(url);
+    if (hit) { setColors(hit); return; }
+    let alive = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      let out = AURA_FALLBACK;
+      try {
+        const S = 24;
+        const c = document.createElement("canvas");
+        c.width = S; c.height = S;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, S, S);
+          const px = ctx.getImageData(0, 0, S, S).data;
+          // 6 hue families (60° each); weight = saturation × how much of the picture they cover
+          const bins = Array.from({ length: 6 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
+          for (let i = 0; i < px.length; i += 4) {
+            const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+            const l = (mx + mn) / 2;
+            if (d < 0.12 || l < 0.12 || l > 0.92) continue;
+            const sat = d / (1 - Math.abs(2 * l - 1));
+            let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+            h = (h * 60 + 360) % 360;
+            const bin = bins[Math.floor(h / 60) % 6];
+            const w = sat;
+            bin.w += w; bin.h += h * w; bin.s += sat * w; bin.l += l * w;
+          }
+          const top = bins.filter(b => b.w > 0).sort((a, b) => b.w - a.w).slice(0, 3);
+          if (top.length) {
+            // Neon = fully saturated, bright, and the three hues clearly apart:
+            // a hue too close to one already picked is swung ~110° away.
+            const apart = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d) >= 50; };
+            const hues: number[] = [];
+            for (const b of top) {
+              const h = Math.round(b.h / b.w);
+              if (hues.every(x => apart(x, h))) hues.push(h);
+            }
+            const base = hues[0];
+            for (const off of [110, -110]) {
+              if (hues.length < 3) {
+                const h = (base + off + 360) % 360;
+                if (hues.every(x => apart(x, h))) hues.push(h);
+              }
+            }
+            while (hues.length < 3) hues.push((base + 180 + hues.length * 40) % 360);
+            out = hues.map(h => `hsl(${h} 100% 56%)`);
+          }
+        }
+      } catch {}
+      auraCache.set(url, out);
+      if (alive) setColors(out);
+    };
+    img.onerror = () => { auraCache.set(url, AURA_FALLBACK); };
+    img.src = url;
+    return () => { alive = false; };
+  }, [url]);
+  return colors;
 }
 
 function ShareIcon() {
@@ -1540,6 +1630,8 @@ export default function Home() {
   };
 
   const currCover = useCroppedCover(tracks[trackIdx]?.imageUrl);
+  const auraColors = useCoverColors(tracks[trackIdx]?.imageUrl);
+  const comments = useComments(tracks[trackIdx]?.id);
   const nextCover = useCroppedCover(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.imageUrl : undefined);
   const currMeta = useTrackMeta(tracks[trackIdx]?.id);
   const nextMeta = useTrackMeta(tracks.length ? tracks[(trackIdx + 1) % tracks.length]?.id : undefined);
@@ -1600,6 +1692,7 @@ export default function Home() {
               <button onClick={() => selectTrack((trackIdx + 1) % n)} className="player__nav" disabled={n < 2} aria-label={`Next: ${nextT.title}`}>›</button>
               <button onClick={() => toggleLike(curr.id)} className={`player__like${likedIds.has(curr.id) ? " is-liked" : ""}`} aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}>{likedIds.has(curr.id) ? "♥" : "♡"} {likeCount}</button>
               <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
+              <CommentsButton c={comments} />
             </div>
             <Scrubber progress={progress} seekTo={seekTo} />
             <div className="player__scrubber-time">
@@ -1624,7 +1717,7 @@ export default function Home() {
               <span className="font-black opacity-40">›</span>
             </button>
             )}
-            <TrackComments trackId={curr.id} />
+            <CommentsPanel c={comments} />
           </div>
         </div>
       )}
@@ -1684,8 +1777,18 @@ export default function Home() {
                 ↩ Back to radio <span className="opacity-60">· now: {source.name}</span>
               </button>
             )}
-            {curr && (!expanded ? (
-              <div className="player mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+            {curr && (
+              <div className="aura-wrap mx-auto mb-6">
+                {(["", " aura--rim"] as const).map(kind => (
+                  <div
+                    key={kind}
+                    className={`aura${kind}${playing ? " is-playing" : ""}`}
+                    aria-hidden
+                    style={{ "--a1": auraColors[0], "--a2": auraColors[1], "--a3": auraColors[2] } as React.CSSProperties}
+                  />
+                ))}
+            {!expanded ? (
+              <div className="player" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 <button
                   className="player__cover overflow-hidden"
                   onClick={() => setExpanded(true)}
@@ -1728,7 +1831,7 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <div className="player-card mx-auto mb-6" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+              <div className="player-card" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                   <button
                     className="player-card__close"
                     onClick={() => setExpanded(false)}
@@ -1782,6 +1885,7 @@ export default function Home() {
                       {likedIds.has(curr.id) ? "♥" : "♡"} {likeCount}
                     </button>
                     <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
+              <CommentsButton c={comments} />
                   </div>
                   <Scrubber progress={progress} seekTo={seekTo} />
                   <div className="player__scrubber-time">
@@ -1809,9 +1913,11 @@ export default function Home() {
                     <span className="font-black opacity-40">›</span>
                   </button>
                   )}
-                  <TrackComments trackId={curr.id} />
+                  <CommentsPanel c={comments} />
                 </div>
-            ))}
+            )}
+              </div>
+            )}
             </div>
 
             <h1 className="display text-2xl md:text-3xl mb-2" style={{ color: "var(--brown)" }}>
