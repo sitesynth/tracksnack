@@ -1485,12 +1485,25 @@ export default function Home() {
   }
 
   // The floating bar only shows while the big player is scrolled out of view.
+  // Measured on scroll/resize rather than observed, so it can't go stale.
   useEffect(() => {
-    const el = heroPlayerRef.current;
-    if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(([e]) => setHeroVisible(e.isIntersecting));
-    io.observe(el);
-    return () => io.disconnect();
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const el = heroPlayerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setHeroVisible(r.bottom > 0 && r.top < window.innerHeight);
+    };
+    const onMove = () => { if (!raf) raf = requestAnimationFrame(check); };
+    check();
+    window.addEventListener("scroll", onMove, { passive: true });
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove);
+      window.removeEventListener("resize", onMove);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [tracks.length > 0]);
 
   /* Share the current song: the phone's share sheet when there is one,
@@ -1711,6 +1724,7 @@ export default function Home() {
                   >
                     ›
                   </button>
+                  <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
                 </div>
               </div>
             ) : (
@@ -2040,6 +2054,7 @@ export default function Home() {
           >
             {likedIds.has(curr.id) ? "♥" : "♡"}
           </button>
+          <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
           <button className="player__play" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
             {playing ? "❚❚" : "▶"}
           </button>
