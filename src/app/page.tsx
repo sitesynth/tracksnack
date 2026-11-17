@@ -1612,7 +1612,8 @@ export default function Home() {
   const [shared, setShared] = useState(false);
   async function shareTrack(t: Track) {
     const link = `${window.location.origin}/t/${t.id}`;
-    const data = { title: t.title, text: `${t.title} — on TrackSnack`, url: link };
+    // Link only: a title/text next to it ends up pasted in front of the URL in chats.
+    const data = { url: link };
     try {
       if (navigator.share) { await navigator.share(data); return; }
     } catch (e) {
