@@ -993,7 +993,7 @@ function SearchSection() {
     <section id="search" className="rounded-xl px-5 md:px-12 py-10 md:py-12" style={{ background: "var(--yellow)" }}>
       <div className="max-w-5xl mx-auto flex flex-col items-center">
         <div className="flex items-center justify-center gap-4 mb-5">
-          <h2 className="display text-3xl md:text-5xl text-center">Find a song</h2>
+          <h2 className="display text-3xl md:text-5xl text-center">Find a track, get a snack</h2>
           <button
             className={`dice-btn${rolling ? " is-rolling" : ""}`}
             onClick={roll}
