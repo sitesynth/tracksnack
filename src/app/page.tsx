@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { GENRES, type GenreKey } from "@/lib/genres";
 
 type Track = {
   id: string;
@@ -784,6 +785,39 @@ function useCoverColors(url?: string): string[] {
   return colors;
 }
 
+/* Text that scrolls back and forth when it doesn't fit its box, and stays
+   still when it does. Speed follows how much has to be revealed. */
+function Marquee({ text, className = "" }: { text: string; className?: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const inner = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const b = box.current, i = inner.current;
+    if (!b || !i) return;
+    const measure = () => {
+      const over = i.scrollWidth - b.clientWidth;
+      if (over > 4) {
+        i.style.setProperty("--sx", `-${over + 8}px`);
+        i.style.animationDuration = `${Math.max(8, 5 + over / 25)}s`;
+        i.classList.add("scrolling");
+      } else {
+        i.style.removeProperty("--sx");
+        i.style.removeProperty("animation-duration");
+        i.classList.remove("scrolling");
+      }
+    };
+    measure();
+    if (!("ResizeObserver" in window)) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(b);
+    return () => ro.disconnect();
+  }, [text]);
+  return (
+    <span ref={box} className={`marquee-box ${className}`}>
+      <span ref={inner} className="player__song-text">{text}</span>
+    </span>
+  );
+}
+
 /* Chunky left arrow with a hard extrusion — same flat-3D look as the site's buttons. */
 function BackIcon() {
   const d = "M3 12l8-8v5h9v6h-9v5z";
@@ -832,26 +866,53 @@ function SearchIcon() {
 
 type SearchHit = RawTrack & { source: { key: string; name: string } };
 
-/* Search the whole library (radio queue, playlists, Fresh). Every hit is a
-   normal card: tap to play it on the shared player. */
+/* One hand-drawn icon per genre, all in the same chunky stroke style. */
+const GENRE_ICONS: Record<GenreKey, React.ReactNode> = {
+  rock: <path d="M13 2 4 14h7l-1 8 9-12h-7z" />,
+  pop: <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />,
+  hiphop: (<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></>),
+  electronic: <path d="M5 20V10M10 20V4M15 20V13M20 20V7" />,
+  jazz: (<><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></>),
+  funk: (<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.5" /><path d="M12 6.5a5.5 5.5 0 0 1 5.5 5.5" /></>),
+  folk: <path d="M5 19C5 10 10 5 20 4c0 10-5 15-14 15zM5 19l8-8" />,
+  blues: <path d="M12 3C9 8 6 11 6 15a6 6 0 0 0 12 0c0-4-3-7-6-12z" />,
+  metal: <path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z" />,
+  classical: <path d="m4 9 8-5 8 5zM6 10v8M10 10v8M14 10v8M18 10v8M4 20h16" />,
+  ambient: <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />,
+  latin: (<><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" /></>),
+};
+const GENRE_COLORS = ["var(--paper)", "var(--mint)", "var(--pink)", "var(--cream)", "var(--violet)", "var(--mustard)"];
+
+/* Search the whole library (radio queue, playlists, Fresh) by words and/or
+   genre chips. Every hit is a normal card: tap to play it on the shared player. */
 function SearchSection() {
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [picked, setPicked] = useState<GenreKey[]>([]);
+  const [limit, setLimit] = useState(20);
+  const [res, setRes] = useState<{ total: number; hits: SearchHit[] } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const term = q.trim();
+  const active = term.length >= 2 || picked.length > 0;
+
+  useEffect(() => { setLimit(20); }, [term, picked]);
+
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) { setHits(null); setBusy(false); return; }
+    if (!active) { setRes(null); setBusy(false); return; }
     setBusy(true);
     let alive = true;
     const t = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(term)}`)
+      const params = new URLSearchParams({ q: term, limit: String(limit) });
+      if (picked.length) params.set("g", picked.join(","));
+      fetch(`/api/search?${params}`)
         .then(r => r.json())
-        .then(d => { if (alive) { setHits(Array.isArray(d) ? d : []); setBusy(false); } })
+        .then(d => { if (alive) { setRes(d && Array.isArray(d.hits) ? d : { total: 0, hits: [] }); setBusy(false); } })
         .catch(() => { if (alive) setBusy(false); });
     }, 250);
     return () => { alive = false; clearTimeout(t); };
-  }, [q]);
+  }, [term, picked, limit, active]);
+
+  const toggleGenre = (k: GenreKey) => setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k]));
 
   return (
     <section id="search" className="rounded-xl px-5 md:px-12 py-10 md:py-12" style={{ background: "var(--yellow)" }}>
@@ -873,27 +934,54 @@ function SearchSection() {
             <button className="search-box__clear" onClick={() => setQ("")} aria-label="Clear search">×</button>
           )}
         </div>
-        {hits && (
+        <div className="genre-chips" role="group" aria-label="Filter by genre">
+          {GENRES.map((g, i) => {
+            const on = picked.includes(g.key);
+            return (
+              <button
+                key={g.key}
+                className={`genre-chip${on ? " is-on" : ""}`}
+                style={{ background: on ? "var(--ink)" : GENRE_COLORS[i % GENRE_COLORS.length], color: on ? "var(--paper)" : "var(--ink)" }}
+                onClick={() => toggleGenre(g.key)}
+                aria-pressed={on}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  {GENRE_ICONS[g.key]}
+                </svg>
+                {g.label}
+              </button>
+            );
+          })}
+        </div>
+        {res && (
           <div className="flex flex-col items-center gap-3 md:gap-4 w-full mt-6">
-            {hits.length === 0 ? (
+            {res.hits.length === 0 ? (
               <p className="font-semibold text-center">
                 Nothing found. <a href="#order-track" className="underline">Order it fresh</a> instead?
               </p>
             ) : (
-              hits.map(h => (
-                <PlaylistMiniPlayer
-                  key={h.id}
-                  playlistId={h.source.key.startsWith("fresh-") ? h.source.key : `s-${h.id}`}
-                  coverUrl={h.image_url}
-                  name={h.source.key.startsWith("fresh-") ? "Fresh" : "Search"}
-                  initialTracks={[h]}
-                  compact
-                />
-              ))
+              <>
+                <p className="menu-type text-sm opacity-70">{res.total} {res.total === 1 ? "song" : "songs"}</p>
+                {res.hits.map(h => (
+                  <PlaylistMiniPlayer
+                    key={h.id}
+                    playlistId={h.source.key.startsWith("fresh-") ? h.source.key : `s-${h.id}`}
+                    coverUrl={h.image_url}
+                    name={h.source.key.startsWith("fresh-") ? "Fresh" : "Search"}
+                    initialTracks={[h]}
+                    compact
+                  />
+                ))}
+                {res.total > res.hits.length && (
+                  <button className="pill pill-paper text-base" onClick={() => setLimit(l => l + 20)}>
+                    Show more ({res.total - res.hits.length})
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
-        {busy && !hits && <p className="mt-4 font-semibold opacity-60">Searching…</p>}
+        {busy && !res && <p className="mt-4 font-semibold opacity-60">Searching…</p>}
       </div>
     </section>
   );
@@ -958,7 +1046,7 @@ function PlaylistMiniPlayer({
         </button>
         <div className="min-w-0 flex-1">
           <p className="display text-base" style={{ overflowWrap: "anywhere" }}>{curr.title}</p>
-          <p className="menu-type text-sm opacity-60 truncate">{genre}</p>
+          <p className="menu-type text-sm opacity-60"><Marquee text={genre} /></p>
           {curr.ordered_for && <p className="menu-type text-sm" style={{ color: "var(--red)" }}>for {curr.ordered_for}</p>}
         </div>
       </div>
@@ -2239,10 +2327,11 @@ export default function Home() {
           <button className="float-bar__main" onClick={openPlayer} aria-label="Open player">
             <img src={currCover || curr.imageUrl} alt="" className="float-bar__cover" />
             <span className="float-bar__text">
-              <span className="float-bar__title">{curr.title}</span>
-              <span className="float-bar__sub">
-                {source.key === "radio" ? "On air · TrackSnack Radio" : `${source.name}${curr.orderedFor ? ` — for ${curr.orderedFor}` : ""}`}
-              </span>
+              <Marquee className="float-bar__title" text={curr.title} />
+              <Marquee
+                className="float-bar__sub"
+                text={source.key === "radio" ? "On air · TrackSnack Radio" : `${source.name}${curr.orderedFor ? ` — for ${curr.orderedFor}` : ""}`}
+              />
             </span>
           </button>
           <button

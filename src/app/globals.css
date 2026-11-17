@@ -1408,9 +1408,6 @@ body {
   font-family: var(--font-display), Impact, serif;
   font-size: 1rem;
   line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .float-bar__sub {
   font-family: var(--font-menu);
@@ -1418,9 +1415,6 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .float-bar__like { min-width: 2.6rem; padding: 0 0.6rem; justify-content: center; }
 .back-to-radio {
@@ -1519,3 +1513,18 @@ body {
   border: 2px solid var(--ink); background: var(--cream-deep);
   font-size: 1.2rem; line-height: 1; font-weight: 900; cursor: pointer;
 }
+
+/* Genre chips under the search box */
+.genre-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; max-width: 34rem; margin-top: 1.1rem; }
+.genre-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.6rem;
+  font-family: var(--font-menu); font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase;
+  border: 2px solid var(--ink); border-radius: 999px;
+  box-shadow: 0 3px 0 0 var(--ink);
+  cursor: pointer; transition: transform 0.08s, box-shadow 0.08s;
+}
+.genre-chip:active, .genre-chip.is-on { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ink); }
+
+/* clip box for scrolling text (see Marquee) */
+.marquee-box { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
