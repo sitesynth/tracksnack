@@ -1441,6 +1441,38 @@ export default function Home() {
     setPlaying(true);
   }
 
+  /* A shared link (/t/<id> → /?t=<id>) opens the song ready to play in the
+     list it lives in. Browsers won't start sound by themselves, so it waits
+     for a tap. */
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (deepLinkDone.current || !tracks.length) return;
+    deepLinkDone.current = true;
+    const id = new URLSearchParams(window.location.search).get("t");
+    if (!id) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    fetch(`/api/track/${encodeURIComponent(id)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((f: { list: RawTrack[]; index: number; source: { key: string; name: string } } | null) => {
+        if (!f) return;
+        liveSyncRef.current = false;
+        djQueueRef.current = null;
+        pendingSeekRef.current = null;
+        if (f.source.key === "radio") {
+          const i = radioTracksRef.current.findIndex(t => t.id === id);
+          if (i >= 0) setTrackIdx(i);
+        } else {
+          sourceRef.current = f.source;
+          setSource(f.source);
+          trackIdxRef.current = f.index;
+          setTracks(mapTracks(f.list));
+          setTrackIdx(f.index);
+        }
+        window.scrollTo({ top: 0 });
+      })
+      .catch(() => {});
+  }, [tracks.length]);
+
   function skip(dir: 1 | -1) {
     const len = tracks.length;
     if (len < 2) return;
@@ -1465,18 +1497,19 @@ export default function Home() {
      otherwise copy the link and flash a checkmark on the button. */
   const [shared, setShared] = useState(false);
   async function shareTrack(t: Track) {
-    const data = { title: t.title, text: `${t.title} — on TrackSnack`, url: t.sunoUrl };
+    const link = `${window.location.origin}/t/${t.id}`;
+    const data = { title: t.title, text: `${t.title} — on TrackSnack`, url: link };
     try {
       if (navigator.share) { await navigator.share(data); return; }
     } catch (e) {
       if ((e as DOMException)?.name === "AbortError") return;
     }
     try {
-      await navigator.clipboard.writeText(t.sunoUrl);
+      await navigator.clipboard.writeText(link);
       setShared(true);
       setTimeout(() => setShared(false), 1800);
     } catch {
-      window.prompt("Copy the link", t.sunoUrl);
+      window.prompt("Copy the link", link);
     }
   }
 
