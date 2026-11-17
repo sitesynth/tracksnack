@@ -942,34 +942,38 @@ function PlaylistMiniPlayer({
   const genre = currMeta ? genreLabel(currMeta.tags) : "";
 
   const compactCard = curr && (
-    <div className="panel flex items-center gap-3 md:gap-4 !p-4 w-full max-w-xl">
-      <button
-        onClick={() => setExpanded(true)}
-        aria-label="Expand player"
-        className="w-14 h-14 rounded-xl border-2 shrink-0 overflow-hidden"
-        style={{ borderColor: "var(--ink)", padding: 0, background: "none", cursor: "pointer", border: "2px solid var(--ink)" }}
-      >
-        <img src={croppedCover || displayCover} alt={curr.title} className="w-full h-full object-cover block" />
-      </button>
-      <div className="min-w-0 flex-1">
-        <p className="display text-base truncate">{curr.title}</p>
-        <p className="menu-type text-sm opacity-60">{genre}</p>
-        {curr.ordered_for && <p className="menu-type text-sm" style={{ color: "var(--red)" }}>for {curr.ordered_for}</p>}
+    <div className="panel flex flex-wrap items-center gap-x-3 gap-y-3 md:gap-4 !p-4 w-full max-w-xl">
+      <div className="flex items-center gap-3 min-w-0 flex-1 basis-full md:basis-0">
+        <button
+          onClick={() => setExpanded(true)}
+          aria-label="Expand player"
+          className="w-16 h-16 rounded-xl border-2 shrink-0 overflow-hidden"
+          style={{ borderColor: "var(--ink)", padding: 0, background: "none", cursor: "pointer", border: "2px solid var(--ink)" }}
+        >
+          <img src={croppedCover || displayCover} alt={curr.title} className="w-full h-full object-cover block" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="display text-base" style={{ overflowWrap: "anywhere" }}>{curr.title}</p>
+          <p className="menu-type text-sm opacity-60 truncate">{genre}</p>
+          {curr.ordered_for && <p className="menu-type text-sm" style={{ color: "var(--red)" }}>for {curr.ordered_for}</p>}
+        </div>
       </div>
-      <button
-        className={`player__like player__like--lg shrink-0${likedIds.has(curr.id) ? " is-liked" : ""}`}
-        onClick={() => toggleLike(curr.id)}
-        aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
-      >
-        {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
-      </button>
-      <button
-        aria-label={playing ? "Pause" : `Play ${curr.title}`}
-        onClick={toggle}
-        className="player__play shrink-0"
-      >
-        {playing ? "❚❚" : "▶"}
-      </button>
+      <div className="flex items-center justify-between gap-3 w-full md:w-auto">
+        <button
+          className={`player__like player__like--lg shrink-0 flex-1 md:flex-none${likedIds.has(curr.id) ? " is-liked" : ""}`}
+          onClick={() => toggleLike(curr.id)}
+          aria-label={likedIds.has(curr.id) ? "Unlike" : "Like"}
+        >
+          {likedIds.has(curr.id) ? "♥" : "♡"} {likeCounts[curr.id] ?? 0}
+        </button>
+        <button
+          aria-label={playing ? "Pause" : `Play ${curr.title}`}
+          onClick={toggle}
+          className="player__play shrink-0"
+        >
+          {playing ? "❚❚" : "▶"}
+        </button>
+      </div>
     </div>
   );
 
