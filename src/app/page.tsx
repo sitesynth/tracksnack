@@ -992,8 +992,12 @@ function SearchSection() {
   return (
     <section id="search" className="rounded-xl px-5 md:px-12 py-10 md:py-12" style={{ background: "var(--yellow)" }}>
       <div className="max-w-5xl mx-auto flex flex-col items-center">
-        <div className="flex items-center justify-center gap-4 mb-5">
-          <h2 className="display text-3xl md:text-5xl text-center">Find a track, get a snack</h2>
+        <div className="flex items-center justify-center gap-2.5 md:gap-3 mb-5">
+          {/* explicit line break on phones so the box hugs the text and the die sits right next to it */}
+          <h2 className="display text-3xl md:text-5xl text-center">
+            <span className="block md:inline whitespace-nowrap">Find a track,</span>{" "}
+            <span className="block md:inline whitespace-nowrap">get a snack</span>
+          </h2>
           <button
             className={`dice-btn${rolling ? " is-rolling" : ""}`}
             onClick={roll}
