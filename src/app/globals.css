@@ -61,7 +61,7 @@ body {
 
 /* ── Display type ───────────────────────────── */
 .display {
-  font-family: var(--font-display), Impact, serif;
+  font-family: var(--font-display), var(--font-display-ru), Impact, serif;
   font-weight: 400;
   letter-spacing: 0.005em;
   line-height: 1.02;
@@ -1000,7 +1000,7 @@ body {
   opacity: 0.45;
 }
 .order-theater__dish {
-  font-family: var(--font-display), serif;
+  font-family: var(--font-display), var(--font-display-ru), serif;
   font-size: 1.35rem;
   line-height: 1.2;
   margin: 0.35rem 0 1.25rem;
@@ -1065,7 +1065,7 @@ body {
   animation: pulse-dot 1s ease-in-out infinite;
 }
 .order-premiere__countdown {
-  font-family: var(--font-display), serif;
+  font-family: var(--font-display), var(--font-display-ru), serif;
   font-size: 7rem;
   line-height: 1;
   color: var(--ink);
@@ -1091,7 +1091,7 @@ body {
   animation: fadeInUp 0.5s ease both;
 }
 .order-premiere__dish {
-  font-family: var(--font-display), serif;
+  font-family: var(--font-display), var(--font-display-ru), serif;
   font-size: 1.5rem;
   color: var(--brown);
   animation: fadeInUp 0.5s 0.15s ease both;
@@ -1405,7 +1405,7 @@ body {
 }
 .float-bar__text { display: flex; flex-direction: column; min-width: 0; }
 .float-bar__title {
-  font-family: var(--font-display), Impact, serif;
+  font-family: var(--font-display), var(--font-display-ru), Impact, serif;
   font-size: 1rem;
   line-height: 1.1;
 }

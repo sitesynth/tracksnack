@@ -1,11 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Alfa_Slab_One, Oswald, Overpass } from "next/font/google";
+import { Alfa_Slab_One, Bitter, Oswald, Overpass } from "next/font/google";
 import "./globals.css";
 
 const display = Alfa_Slab_One({
   weight: "400",
   subsets: ["latin"],
+  // no generated Arial-based fallback: it would swallow Cyrillic before Bitter gets a turn
+  adjustFontFallback: false,
   variable: "--font-display",
+});
+
+// Alfa Slab One has no Cyrillic: Russian letters in titles fall back to Bitter
+// Black, the closest heavy slab that does (the browser picks per character).
+const displayRu = Bitter({
+  weight: "900",
+  subsets: ["cyrillic"],
+  variable: "--font-display-ru",
 });
 
 const menu = Oswald({
@@ -50,7 +60,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${menu.variable} ${sans.variable}`}>
+      <body className={`${display.variable} ${displayRu.variable} ${menu.variable} ${sans.variable}`}>
         {children}
       </body>
     </html>
