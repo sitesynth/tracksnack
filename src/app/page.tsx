@@ -906,9 +906,9 @@ const PIPS: Record<number, [number, number][]> = {
   5: [[8, 8], [16, 8], [12, 12], [8, 16], [16, 16]],
   6: [[8, 8], [16, 8], [8, 12], [16, 12], [8, 16], [16, 16]],
 };
-function DiceIcon({ face }: { face: number }) {
+function DiceIcon({ face, size = 30 }: { face: number; size?: number }) {
   return (
-    <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden style={{ overflow: "visible" }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ overflow: "visible" }}>
       <rect x="4.2" y="4.2" width="17" height="17" rx="4" fill="currentColor" />
       <rect x="2" y="2" width="17" height="17" rx="4" fill="var(--paper)" stroke="currentColor" strokeWidth="2" />
       {(PIPS[face] ?? PIPS[5]).map(([x, y], i) => (
@@ -1914,6 +1914,59 @@ export default function Home() {
     }
   }
 
+  /* Dice in the player: plays a random song from the whole library. The pick
+     is fetched ahead of time so the tap itself can start the sound — phones
+     refuse to start audio after a network wait. */
+  const luckyRef = useRef<SearchHit | null>(null);
+  const [diceRolling, setDiceRolling] = useState(false);
+  const [diceFace, setDiceFace] = useState(5);
+  const prefetchLucky = useCallback(() => {
+    fetch("/api/search?random=1")
+      .then(r => r.json())
+      .then(d => { if (d?.hits?.[0]) luckyRef.current = d.hits[0]; })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { prefetchLucky(); }, [prefetchLucky]);
+
+  function rollRandom() {
+    if (diceRolling) return;
+    setDiceRolling(true);
+    const spin = setInterval(() => setDiceFace(1 + Math.floor(Math.random() * 6)), 110);
+    const play = (h: SearchHit) => {
+      const fresh = h.source.key.startsWith("fresh-");
+      playList(fresh ? h.source.key : `s-${h.id}`, fresh ? "Fresh" : "Random", [h], 0);
+    };
+    const hit = luckyRef.current;
+    luckyRef.current = null;
+    const done = () => {
+      clearInterval(spin);
+      setDiceFace(1 + Math.floor(Math.random() * 6));
+      setDiceRolling(false);
+      prefetchLucky();
+    };
+    if (hit) {
+      play(hit);
+      setTimeout(done, 900);
+    } else {
+      fetch("/api/search?random=1")
+        .then(r => r.json())
+        .then(d => { if (d?.hits?.[0]) play(d.hits[0]); })
+        .catch(() => {})
+        .finally(() => setTimeout(done, 600));
+    }
+  }
+
+  const diceBtn = (cls: string) => (
+    <button
+      className={`${cls} player__dice${diceRolling ? " is-rolling" : ""}`}
+      onClick={rollRandom}
+      aria-label="Play a random track"
+      title="Random track"
+    >
+      <DiceIcon face={diceFace} size={20} />
+    </button>
+  );
+
   const playerApi: PlayerApi = {
     sourceKey: source.key,
     playing,
@@ -2003,6 +2056,7 @@ export default function Home() {
                   {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
                 </button>
               ))}
+              {diceBtn("player__mode")}
             </div>
             {n > 1 && (
             <button className="player-card__next" style={{ width: "100%" }} onClick={() => selectTrack((trackIdx + 1) % n)}>
@@ -2126,6 +2180,7 @@ export default function Home() {
                     ›
                   </button>
                   <button onClick={() => shareTrack(curr)} className="player__nav player__share" aria-label="Share this song" title="Share">{shared ? "✓" : <ShareIcon />}</button>
+                  {diceBtn("player__nav")}
                 </div>
               </div>
             ) : (
@@ -2196,6 +2251,7 @@ export default function Home() {
                         {m === "seq" ? "▶▶" : m === "loop" ? "↺" : "⇌"}
                       </button>
                     ))}
+              {diceBtn("player__mode")}
                   </div>
                   {n > 1 && (
                   <button
