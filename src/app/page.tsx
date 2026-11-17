@@ -821,6 +821,84 @@ type PlayerApi = {
 };
 const PlayerCtx = createContext<PlayerApi | null>(null);
 
+function SearchIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M15.5 15.5 21 21" />
+    </svg>
+  );
+}
+
+type SearchHit = RawTrack & { source: { key: string; name: string } };
+
+/* Search the whole library (radio queue, playlists, Fresh). Every hit is a
+   normal card: tap to play it on the shared player. */
+function SearchSection() {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setHits(null); setBusy(false); return; }
+    setBusy(true);
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(term)}`)
+        .then(r => r.json())
+        .then(d => { if (alive) { setHits(Array.isArray(d) ? d : []); setBusy(false); } })
+        .catch(() => { if (alive) setBusy(false); });
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q]);
+
+  return (
+    <section id="search" className="rounded-xl px-5 md:px-12 py-10 md:py-12" style={{ background: "var(--yellow)" }}>
+      <div className="max-w-5xl mx-auto flex flex-col items-center">
+        <h2 className="display text-3xl md:text-5xl mb-5 text-center">Find a song</h2>
+        <div className="search-box">
+          <span className="search-box__icon"><SearchIcon /></span>
+          <input
+            type="search"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Title, name, playlist…"
+            className="search-input"
+            aria-label="Search songs"
+            enterKeyHint="search"
+            autoComplete="off"
+          />
+          {q && (
+            <button className="search-box__clear" onClick={() => setQ("")} aria-label="Clear search">×</button>
+          )}
+        </div>
+        {hits && (
+          <div className="flex flex-col items-center gap-3 md:gap-4 w-full mt-6">
+            {hits.length === 0 ? (
+              <p className="font-semibold text-center">
+                Nothing found. <a href="#order-track" className="underline">Order it fresh</a> instead?
+              </p>
+            ) : (
+              hits.map(h => (
+                <PlaylistMiniPlayer
+                  key={h.id}
+                  playlistId={h.source.key.startsWith("fresh-") ? h.source.key : `s-${h.id}`}
+                  coverUrl={h.image_url}
+                  name={h.source.key.startsWith("fresh-") ? "Fresh" : "Search"}
+                  initialTracks={[h]}
+                  compact
+                />
+              ))
+            )}
+          </div>
+        )}
+        {busy && !hits && <p className="mt-4 font-semibold opacity-60">Searching…</p>}
+      </div>
+    </section>
+  );
+}
+
 function PlaylistMiniPlayer({
   playlistId,
   coverUrl,
@@ -1971,6 +2049,8 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      <SearchSection />
 
       {/* ── Menu ───────────────────────────────── */}
       <section id="menu" className="rounded-xl px-5 md:px-12 py-12 md:py-16" style={{ background: "var(--cream)" }}>

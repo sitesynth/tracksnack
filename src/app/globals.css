@@ -1491,3 +1491,31 @@ body {
 .billboard h1 ~ * { position: relative; z-index: 2; }
 .aura-wrap + *, .back-to-radio { position: relative; z-index: 2; }
 .back-to-radio { display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.3rem 1rem 0.3rem 0.7rem; }
+
+/* ── Library search ── */
+.search-box { position: relative; width: 100%; max-width: 30rem; }
+.search-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  padding: 0.9rem 2.8rem 0.9rem 3rem;
+  font-family: var(--font-menu);
+  font-size: 1.05rem; /* 16px+ keeps iOS from zooming the page on focus */
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 0 var(--ink);
+  outline: none;
+}
+.search-input:focus { box-shadow: 0 4px 0 0 var(--ink), 0 0 0 4px rgba(224, 48, 30, 0.35); }
+.search-input::placeholder { color: var(--ink); opacity: 0.4; }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-box__icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-52%); display: flex; pointer-events: none; }
+.search-box__clear {
+  position: absolute; right: 0.55rem; top: 50%; transform: translateY(-55%);
+  width: 2rem; height: 2rem; border-radius: 50%;
+  border: 2px solid var(--ink); background: var(--cream-deep);
+  font-size: 1.2rem; line-height: 1; font-weight: 900; cursor: pointer;
+}
