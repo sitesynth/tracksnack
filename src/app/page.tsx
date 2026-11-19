@@ -2507,6 +2507,16 @@ export default function Home() {
 
       {/* ── Floating player bar: one shared player, always in reach ── */}
       {barVisible && curr && (
+        <div
+          className={`float-wrap${playing ? " is-playing" : ""}`}
+          style={{ "--a1": auraColors[0], "--a2": auraColors[1], "--a3": auraColors[2] } as React.CSSProperties}
+        >
+          {/* light behind the bar: a thin neon rim plus bars that sway like a spectrum
+              (a look only — it is not analysing the sound) */}
+          <div className={`aura aura--rim${playing ? " is-playing" : ""}`} aria-hidden />
+          <div className="float-spectrum" aria-hidden>
+            {Array.from({ length: 9 }, (_, i) => <i key={i} />)}
+          </div>
         <div className="float-bar" role="region" aria-label="Now playing">
           <button className="float-bar__main" onClick={openPlayer} aria-label="Open player">
             <img src={currCover || curr.imageUrl} alt="" className="float-bar__cover" />
@@ -2529,6 +2539,7 @@ export default function Home() {
           <button className="player__play" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
             {playing ? "❚❚" : "▶"}
           </button>
+        </div>
         </div>
       )}
     </div>
